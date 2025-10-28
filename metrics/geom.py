@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import random
+from itertools import combinations
 from typing import Dict, Iterable, List, Mapping, MutableMapping, Sequence, Tuple
 
 from engine.hypergraph import Adjacency
@@ -79,4 +80,29 @@ def mean_forman_curvature(adjacency: Adjacency) -> float:
     return total / edge_count
 
 
-__all__ = ["spectral_dimension", "mean_forman_curvature"]
+def average_clustering_coefficient(adjacency: Adjacency) -> float:
+    """Return the mean local clustering coefficient of the graph."""
+
+    if not adjacency:
+        return float("nan")
+
+    coefficients: List[float] = []
+    for node, neighbors in adjacency.items():
+        degree = len(neighbors)
+        if degree < 2:
+            continue
+        link_count = 0
+        for u, v in combinations(sorted(neighbors), 2):
+            if u in adjacency and v in adjacency[u]:
+                link_count += 1
+        possible_links = degree * (degree - 1) / 2
+        if possible_links > 0:
+            coefficients.append(link_count / possible_links)
+
+    if not coefficients:
+        return float("nan")
+
+    return sum(coefficients) / len(coefficients)
+
+
+__all__ = ["spectral_dimension", "mean_forman_curvature", "average_clustering_coefficient"]

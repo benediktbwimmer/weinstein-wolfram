@@ -6,7 +6,11 @@ from typing import Dict, List
 
 from engine.rewrite import RewriteEngine
 
-from .geom import mean_forman_curvature, spectral_dimension
+from .geom import (
+    average_clustering_coefficient,
+    mean_forman_curvature,
+    spectral_dimension,
+)
 
 
 def _safe_ratio(numerator: float, denominator: float) -> float:
@@ -47,6 +51,7 @@ def compute_unification_summary(
         seed=spectral_seed,
     )
     curvature = mean_forman_curvature(skeleton)
+    clustering = average_clustering_coefficient(skeleton)
 
     causal_stats = engine.causal_graph.basic_stats()
     node_count = hypergraph.node_count
@@ -76,6 +81,7 @@ def compute_unification_summary(
         "average_nodes_created_per_event": float(avg_created),
         "spectral_dimension": ds,
         "mean_forman_curvature": curvature,
+        "mean_clustering_coefficient": clustering,
         "causal_max_depth": causal_stats.get("max_depth", float("nan")),
         "causal_avg_indegree": causal_stats.get("avg_indegree", float("nan")),
         "causal_avg_outdegree": causal_stats.get("avg_outdegree", float("nan")),
