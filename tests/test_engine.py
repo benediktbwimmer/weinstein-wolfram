@@ -7,6 +7,7 @@ import math
 import pytest
 
 from engine.hypergraph import Hypergraph
+from engine.multiway import MultiwaySystem
 from engine.rewrite import EdgeSplit3Rule, RewriteEngine
 from metrics import (
     ToyModelResult,
@@ -33,6 +34,29 @@ def test_rewrite_engine_grows_hypergraph() -> None:
     assert len(engine.events) == 10
     stats = engine.causal_graph.basic_stats()
     assert stats["event_count"] == 10
+
+
+def test_multiway_system_evolution_records_branching() -> None:
+    base = Hypergraph([(0, 1, 2), (0, 2, 3)])
+    system = MultiwaySystem(base, [EdgeSplit3Rule()])
+    evolution = system.run(max_generations=2)
+
+    histogram = evolution.depth_histogram()
+    assert histogram[0] == 1
+    assert sum(histogram.values()) == evolution.state_count
+    assert evolution.event_count >= histogram.get(1, 0)
+    assert evolution.average_branching_factor() > 0
+    assert all(
+        child in evolution.states
+        for children in evolution.adjacency.values()
+        for child in children
+    )
+
+
+def test_multiway_system_validates_generations() -> None:
+    system = MultiwaySystem(Hypergraph([(0, 1, 2)]), [EdgeSplit3Rule()])
+    with pytest.raises(ValueError):
+        system.run(max_generations=-1)
 
 
 def test_geometric_metrics_return_values() -> None:
@@ -64,6 +88,10 @@ def test_unification_summary_blends_metrics() -> None:
     assert summary["unity_consistency"] == summary["unity_consistency"]
     assert summary["causal_max_depth"] >= 0
     assert summary["mean_clustering_coefficient"] == summary["mean_clustering_coefficient"]
+    assert summary["multiway_state_count"] >= 1
+    assert summary["multiway_event_count"] >= 0
+    assert summary["multiway_avg_branching_factor"] >= 0
+    assert summary["multiway_frontier_size"] >= 1
 
 
 def test_collect_unification_dynamics_tracks_growth() -> None:

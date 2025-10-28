@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from typing import Callable, Dict, Iterable, List, Sequence, Tuple
 
+from engine.multiway import MultiwaySystem
 from engine.rewrite import RewriteEngine
 
 from .geom import (
@@ -98,6 +99,8 @@ def compute_unification_summary(
     * **Geometric Unity** (à la Weinstein): coarse geometric observables derived
       from the 1-skeleton of the hypergraph which stand in for curvature and
       effective dimensionality.
+    * **Multiway structure**: branching characteristics of the rewrite system
+      when all applicable updates are explored in parallel.
 
     The dictionary values are floats for ease of downstream analysis and may be
     ``NaN`` when a metric is undefined.
@@ -149,6 +152,22 @@ def compute_unification_summary(
         "discretization_index": discretization_index,
         "unity_consistency": unity_consistency,
     }
+
+    multiway = MultiwaySystem(hypergraph.copy(), [engine.rule])
+    evolution = multiway.run(max_generations=2)
+    histogram = evolution.depth_histogram()
+    max_depth = max(histogram.keys(), default=0)
+    frontier_size = len(evolution.frontier(max_depth)) if histogram else 1
+
+    summary.update(
+        {
+            "multiway_state_count": float(evolution.state_count),
+            "multiway_event_count": float(evolution.event_count),
+            "multiway_max_depth": float(max_depth),
+            "multiway_avg_branching_factor": evolution.average_branching_factor(),
+            "multiway_frontier_size": float(frontier_size),
+        }
+    )
 
     return summary
 

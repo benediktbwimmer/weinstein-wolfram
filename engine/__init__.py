@@ -4,4 +4,5 @@ __all__ = [
     "hypergraph",
     "rewrite",
     "causal",
+    "multiway",
 ]
