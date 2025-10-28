@@ -9,6 +9,7 @@ from engine.rewrite import EdgeSplit3Rule, RewriteEngine
 from metrics import (
     collect_unification_dynamics,
     compute_unification_summary,
+    derive_unification_principles,
     generate_unification_certificate,
 )
 from metrics.geom import (
@@ -111,3 +112,27 @@ def test_generate_unification_certificate_reports_bridge_metrics() -> None:
     assert 0.0 <= dual <= 1.0000001
     assert synergy > 0
     assert strength > 0
+
+
+def test_derive_unification_principles_follows_first_principles() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=15)
+    principles = derive_unification_principles(
+        engine,
+        steps=12,
+        spectral_max_time=4,
+        spectral_trials=60,
+        spectral_seed=19,
+    )
+
+    assert principles["growth_rate"] > 0
+    assert principles["causal_alignment"] == principles["causal_alignment"]
+    assert principles["geometric_balance"] > 0
+    assert 0 < principles["unity_stability"] <= 1.0
+
+
+def test_derive_unification_principles_requires_positive_steps() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=21)
+    with pytest.raises(ValueError):
+        derive_unification_principles(engine, steps=0)

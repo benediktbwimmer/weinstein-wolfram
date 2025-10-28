@@ -9,6 +9,7 @@ from .causal import summarize_causal_graph
 from .unification import (
     collect_unification_dynamics,
     compute_unification_summary,
+    derive_unification_principles,
     generate_unification_certificate,
 )
 
@@ -20,4 +21,5 @@ __all__ = [
     "compute_unification_summary",
     "collect_unification_dynamics",
     "generate_unification_certificate",
+    "derive_unification_principles",
 ]
