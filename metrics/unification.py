@@ -402,6 +402,110 @@ def derive_unification_principles(
     }
 
 
+def evaluate_unification_alignment(
+    engine: RewriteEngine,
+    steps: int,
+    *,
+    spectral_max_time: int = 6,
+    spectral_trials: int = 200,
+    spectral_seed: int | None = None,
+) -> Dict[str, float]:
+    """Quantify how discrete, causal, and geometric metrics evolve together."""
+
+    if steps <= 0:
+        raise ValueError("steps must be positive")
+
+    history = collect_unification_dynamics(
+        engine,
+        steps,
+        include_initial=True,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=spectral_seed,
+    )
+
+    if len(history) < 2:
+        return {
+            "discrete_geometric_correlation": float("nan"),
+            "causal_geometric_correlation": float("nan"),
+            "multiway_branching_correlation": float("nan"),
+            "information_density_trend": float("nan"),
+            "unity_range": float("nan"),
+            "alignment_score": float("nan"),
+        }
+
+    discrete_pairs = _collect_pairs(
+        history,
+        "discretization_index",
+        "unity_consistency",
+    )
+    discrete_corr = _pearson_from_pairs(discrete_pairs)
+
+    causal_pairs = _collect_pairs(
+        history,
+        "causal_max_depth",
+        "unity_consistency",
+        x_transform=lambda depth, entry: depth
+        / (1.0 + float(entry.get("event_count", 0.0))),
+    )
+    causal_corr = _pearson_from_pairs(causal_pairs)
+
+    multiway_pairs = _collect_pairs(
+        history,
+        "multiway_max_depth",
+        "multiway_frontier_size",
+    )
+    multiway_corr = _pearson_from_pairs(multiway_pairs)
+
+    info_density_values = [
+        float(entry.get("information_density", float("nan"))) for entry in history
+    ]
+    event_counts = [float(entry.get("event_count", 0.0)) for entry in history]
+
+    first_density = next(
+        (value for value in info_density_values if math.isfinite(value)),
+        float("nan"),
+    )
+    last_density = next(
+        (
+            value
+            for value in reversed(info_density_values)
+            if math.isfinite(value)
+        ),
+        float("nan"),
+    )
+    event_span = event_counts[-1] - event_counts[0]
+    if math.isfinite(first_density) and math.isfinite(last_density):
+        information_density_trend = _safe_ratio(last_density - first_density, event_span)
+    else:
+        information_density_trend = float("nan")
+
+    unity_values = [
+        float(entry.get("unity_consistency", float("nan"))) for entry in history
+    ]
+    finite_unity = [value for value in unity_values if math.isfinite(value)]
+    if finite_unity:
+        unity_range = max(finite_unity) - min(finite_unity)
+    else:
+        unity_range = float("nan")
+
+    alignment_components = [
+        abs(value)
+        for value in (discrete_corr, causal_corr, multiway_corr)
+        if math.isfinite(value)
+    ]
+    alignment_score = _finite_average(alignment_components)
+
+    return {
+        "discrete_geometric_correlation": discrete_corr,
+        "causal_geometric_correlation": causal_corr,
+        "multiway_branching_correlation": multiway_corr,
+        "information_density_trend": information_density_trend,
+        "unity_range": unity_range,
+        "alignment_score": alignment_score,
+    }
+
+
 def assess_unification_robustness(
     engine_factory: Callable[[], RewriteEngine],
     *,
@@ -537,4 +641,5 @@ __all__ = [
     "generate_unification_certificate",
     "derive_unification_principles",
     "assess_unification_robustness",
+    "evaluate_unification_alignment",
 ]

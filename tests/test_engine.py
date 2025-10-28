@@ -15,6 +15,7 @@ from metrics import (
     collect_unification_dynamics,
     compute_unification_summary,
     derive_unification_principles,
+    evaluate_unification_alignment,
     generate_unification_certificate,
     run_toy_unification_model,
 )
@@ -167,6 +168,35 @@ def test_generate_unification_certificate_reports_bridge_metrics() -> None:
     assert strength > 0
 
 
+def test_evaluate_unification_alignment_quantifies_interplay() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=31)
+    alignment = evaluate_unification_alignment(
+        engine,
+        steps=10,
+        spectral_max_time=4,
+        spectral_trials=60,
+        spectral_seed=37,
+    )
+
+    for key in (
+        "discrete_geometric_correlation",
+        "causal_geometric_correlation",
+        "multiway_branching_correlation",
+        "information_density_trend",
+        "unity_range",
+        "alignment_score",
+    ):
+        assert key in alignment
+    assert math.isfinite(alignment["discrete_geometric_correlation"])
+    assert math.isfinite(alignment["causal_geometric_correlation"])
+    multiway_corr = alignment["multiway_branching_correlation"]
+    assert math.isnan(multiway_corr) or -1.0 <= multiway_corr <= 1.0
+    assert math.isfinite(alignment["information_density_trend"])
+    assert alignment["alignment_score"] >= 0
+    assert alignment["unity_range"] >= 0 or math.isnan(alignment["unity_range"])
+
+
 def test_derive_unification_principles_follows_first_principles() -> None:
     hypergraph = Hypergraph([(0, 1, 2)])
     engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=15)
@@ -252,5 +282,6 @@ def test_run_toy_unification_model_produces_bridge_metrics() -> None:
     assert result.final_summary == result.history[-1]
     assert result.certificate["certificate_strength"] > 0
     assert result.principles["growth_rate"] > 0
+    assert result.alignment["alignment_score"] >= 0
     assert result.robustness["replicates"] == 2.0
     assert result.robustness["mean_final_unity"] == result.robustness["mean_final_unity"]
