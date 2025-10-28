@@ -11,6 +11,7 @@ from engine.rewrite import EdgeSplit3Rule, RewriteEngine
 from .unification import (
     assess_unification_robustness,
     collect_unification_dynamics,
+    construct_unification_landscape,
     derive_unification_principles,
     evaluate_unification_alignment,
     generate_unification_certificate,
@@ -27,6 +28,7 @@ class ToyModelResult:
     principles: Dict[str, float]
     alignment: Dict[str, float]
     robustness: Dict[str, float]
+    landscape: Dict[str, float]
 
 
 def run_toy_unification_model(
@@ -37,6 +39,7 @@ def run_toy_unification_model(
     spectral_max_time: int = 4,
     spectral_trials: int = 80,
     seed: int = 0,
+    multiway_generations: int = 2,
 ) -> ToyModelResult:
     """Execute a minimal experiment linking discrete rewrites to geometric cues.
 
@@ -58,6 +61,12 @@ def run_toy_unification_model(
     ``robustness``
         Aggregate statistics across multiple replicas, demonstrating that the
         bridge remains stable under stochastic variation.
+    ``landscape``
+        A synthesized summary of the multiway/discrete interplay generated via
+        :func:`metrics.unification.construct_unification_landscape`.
+
+    The ``multiway_generations`` parameter adjusts how deeply the auxiliary
+    multiway explorations probe when constructing these summaries.
     """
 
     if steps <= 0:
@@ -82,6 +91,7 @@ def run_toy_unification_model(
         spectral_max_time=spectral_max_time,
         spectral_trials=spectral_trials,
         spectral_seed=seed,
+        multiway_generations=multiway_generations,
     )
     final_summary = history[-1]
 
@@ -92,6 +102,7 @@ def run_toy_unification_model(
         spectral_max_time=spectral_max_time,
         spectral_trials=spectral_trials,
         spectral_seed=seed + 1,
+        multiway_generations=multiway_generations,
     )
 
     principles_engine = make_engine(seed + 2)
@@ -101,6 +112,7 @@ def run_toy_unification_model(
         spectral_max_time=spectral_max_time,
         spectral_trials=spectral_trials,
         spectral_seed=seed + 2,
+        multiway_generations=multiway_generations,
     )
 
     alignment_engine = make_engine(seed + 3)
@@ -110,6 +122,7 @@ def run_toy_unification_model(
         spectral_max_time=spectral_max_time,
         spectral_trials=spectral_trials,
         spectral_seed=seed + 3,
+        multiway_generations=multiway_generations,
     )
 
     def factory_generator() -> "Factory":
@@ -131,6 +144,17 @@ def run_toy_unification_model(
         spectral_max_time=spectral_max_time,
         spectral_trials=spectral_trials,
         spectral_seed=seed + 4,
+        multiway_generations=multiway_generations,
+    )
+
+    landscape_engine = make_engine(seed + 5)
+    landscape = construct_unification_landscape(
+        landscape_engine,
+        steps=steps,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=seed + 5,
+        multiway_generations=multiway_generations,
     )
 
     return ToyModelResult(
@@ -140,6 +164,7 @@ def run_toy_unification_model(
         principles=principles,
         alignment=alignment,
         robustness=robustness,
+        landscape=landscape,
     )
 
 

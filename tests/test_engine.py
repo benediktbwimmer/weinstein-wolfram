@@ -13,6 +13,7 @@ from metrics import (
     ToyModelResult,
     assess_unification_robustness,
     collect_unification_dynamics,
+    construct_unification_landscape,
     compute_unification_summary,
     derive_unification_principles,
     evaluate_unification_alignment,
@@ -82,6 +83,7 @@ def test_unification_summary_blends_metrics() -> None:
         spectral_max_time=4,
         spectral_trials=80,
         spectral_seed=4,
+        multiway_generations=3,
     )
     assert summary["event_count"] == 20
     assert summary["node_count"] >= 3
@@ -104,6 +106,7 @@ def test_collect_unification_dynamics_tracks_growth() -> None:
         spectral_max_time=4,
         spectral_trials=40,
         spectral_seed=11,
+        multiway_generations=2,
     )
 
     assert len(history) == 5  # initial snapshot + four new events
@@ -132,6 +135,7 @@ def test_collect_unification_dynamics_with_sampling_interval() -> None:
         spectral_max_time=2,
         spectral_trials=20,
         spectral_seed=29,
+        multiway_generations=1,
     )
 
     assert len(history) == 4  # initial + three sampled summaries (2, 4, 5 events)
@@ -158,6 +162,7 @@ def test_generate_unification_certificate_reports_bridge_metrics() -> None:
         spectral_max_time=4,
         spectral_trials=60,
         spectral_seed=13,
+        multiway_generations=2,
     )
     dual = certificate["dual_correlation"]
     synergy = certificate["causal_synergy"]
@@ -177,6 +182,7 @@ def test_evaluate_unification_alignment_quantifies_interplay() -> None:
         spectral_max_time=4,
         spectral_trials=60,
         spectral_seed=37,
+        multiway_generations=2,
     )
 
     for key in (
@@ -206,6 +212,7 @@ def test_derive_unification_principles_follows_first_principles() -> None:
         spectral_max_time=4,
         spectral_trials=60,
         spectral_seed=19,
+        multiway_generations=2,
     )
 
     assert principles["growth_rate"] > 0
@@ -239,6 +246,7 @@ def test_assess_unification_robustness_aggregates_replicates() -> None:
         spectral_max_time=4,
         spectral_trials=60,
         spectral_seed=7,
+        multiway_generations=2,
     )
 
     assert result["replicates"] == 4.0
@@ -273,6 +281,7 @@ def test_run_toy_unification_model_produces_bridge_metrics() -> None:
         spectral_max_time=3,
         spectral_trials=40,
         seed=42,
+        multiway_generations=2,
     )
 
     assert isinstance(result, ToyModelResult)
@@ -285,3 +294,74 @@ def test_run_toy_unification_model_produces_bridge_metrics() -> None:
     assert result.alignment["alignment_score"] >= 0
     assert result.robustness["replicates"] == 2.0
     assert result.robustness["mean_final_unity"] == result.robustness["mean_final_unity"]
+    assert result.landscape["history_length"] == float(len(result.history))
+    assert math.isfinite(result.landscape["layered_frontier_mean"]) or math.isnan(
+        result.landscape["layered_frontier_mean"]
+    )
+
+
+def test_compute_unification_summary_respects_multiway_generations() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=43)
+    engine.run(steps=5)
+
+    shallow = compute_unification_summary(
+        engine,
+        spectral_max_time=2,
+        spectral_trials=40,
+        spectral_seed=44,
+        multiway_generations=0,
+    )
+    deep = compute_unification_summary(
+        engine,
+        spectral_max_time=2,
+        spectral_trials=40,
+        spectral_seed=45,
+        multiway_generations=3,
+    )
+
+    assert shallow["multiway_state_count"] == 1.0
+    assert shallow["multiway_event_count"] == 0.0
+    assert deep["multiway_state_count"] >= shallow["multiway_state_count"]
+    assert deep["multiway_max_depth"] <= 3
+
+    with pytest.raises(ValueError):
+        compute_unification_summary(
+            engine,
+            spectral_max_time=2,
+            spectral_trials=20,
+            spectral_seed=46,
+            multiway_generations=-1,
+        )
+
+
+def test_construct_unification_landscape_summarizes_multiway_interplay() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=51)
+    landscape = construct_unification_landscape(
+        engine,
+        steps=5,
+        spectral_max_time=2,
+        spectral_trials=20,
+        spectral_seed=53,
+        multiway_generations=2,
+    )
+
+    assert landscape["history_length"] >= 1.0
+    assert landscape["multiway_generations"] == 2.0
+    assert math.isnan(landscape["unity_frontier_correlation"]) or -1.0 <= landscape[
+        "unity_frontier_correlation"
+    ] <= 1.0
+    assert math.isnan(landscape["multiway_depth_range"]) or landscape[
+        "multiway_depth_range"
+    ] >= 0.0
+
+
+def test_construct_unification_landscape_validates_inputs() -> None:
+    engine = RewriteEngine(Hypergraph([(0, 1, 2)]), EdgeSplit3Rule(), seed=59)
+    with pytest.raises(ValueError):
+        construct_unification_landscape(engine, steps=0)
+    with pytest.raises(ValueError):
+        construct_unification_landscape(engine, steps=1, sample_interval=0)
+    with pytest.raises(ValueError):
+        construct_unification_landscape(engine, steps=1, multiway_generations=-1)
