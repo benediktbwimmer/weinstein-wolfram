@@ -91,11 +91,31 @@ def test_collect_unification_dynamics_tracks_growth() -> None:
     ]
 
 
+def test_collect_unification_dynamics_with_sampling_interval() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=23)
+    history = collect_unification_dynamics(
+        engine,
+        steps=5,
+        sample_interval=2,
+        spectral_max_time=2,
+        spectral_trials=20,
+        spectral_seed=29,
+    )
+
+    assert len(history) == 4  # initial + three sampled summaries (2, 4, 5 events)
+    event_counts = [entry["event_count"] for entry in history]
+    assert event_counts == [0.0, 2.0, 4.0, 5.0]
+    assert all(later >= earlier for earlier, later in zip(event_counts, event_counts[1:]))
+
+
 def test_collect_unification_dynamics_requires_non_negative_steps() -> None:
     hypergraph = Hypergraph([(0, 1, 2)])
     engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=9)
     with pytest.raises(ValueError):
         collect_unification_dynamics(engine, steps=-1)
+    with pytest.raises(ValueError):
+        collect_unification_dynamics(engine, steps=1, sample_interval=0)
 
 
 def test_generate_unification_certificate_reports_bridge_metrics() -> None:

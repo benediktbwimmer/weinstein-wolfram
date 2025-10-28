@@ -158,6 +158,7 @@ def collect_unification_dynamics(
     steps: int,
     *,
     include_initial: bool = True,
+    sample_interval: int = 1,
     spectral_max_time: int = 6,
     spectral_trials: int = 200,
     spectral_seed: int | None = None,
@@ -173,6 +174,10 @@ def collect_unification_dynamics(
     include_initial:
         If ``True`` (the default), the summary before any additional rewrites
         are applied is included as the first element of the returned list.
+    sample_interval:
+        Number of rewrite steps to perform between consecutive summaries.  Must
+        be positive.  When ``steps`` is not a multiple of ``sample_interval``
+        the final partial batch is still recorded.
     spectral_max_time, spectral_trials, spectral_seed:
         Parameters forwarded to :func:`compute_unification_summary` for
         spectral-dimension estimation.
@@ -180,6 +185,8 @@ def collect_unification_dynamics(
 
     if steps < 0:
         raise ValueError("steps must be non-negative")
+    if sample_interval <= 0:
+        raise ValueError("sample_interval must be positive")
 
     summaries: List[Dict[str, float]] = []
     if include_initial:
@@ -192,8 +199,11 @@ def collect_unification_dynamics(
             )
         )
 
-    for _ in range(steps):
-        engine.step()
+    remaining = steps
+    while remaining > 0:
+        batch = min(sample_interval, remaining)
+        for _ in range(batch):
+            engine.step()
         summaries.append(
             compute_unification_summary(
                 engine,
@@ -202,6 +212,7 @@ def collect_unification_dynamics(
                 spectral_seed=spectral_seed,
             )
         )
+        remaining -= batch
 
     return summaries
 
