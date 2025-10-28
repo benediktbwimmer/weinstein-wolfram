@@ -372,9 +372,139 @@ def derive_unification_principles(
     }
 
 
+def assess_unification_robustness(
+    engine_factory: Callable[[], RewriteEngine],
+    *,
+    steps: int,
+    replicates: int = 3,
+    spectral_max_time: int = 6,
+    spectral_trials: int = 200,
+    spectral_seed: int | None = None,
+) -> Dict[str, float]:
+    """Evaluate how reproducible the blended metrics are across runs.
+
+    Parameters
+    ----------
+    engine_factory:
+        Callable that returns a fresh :class:`~engine.rewrite.RewriteEngine` for
+        each replicate.  The hypergraph inside the engine is mutated in-place
+        during assessment and therefore must not be reused across replicates.
+    steps:
+        Number of rewrite steps to execute per replicate.  Must be positive.
+    replicates:
+        Number of independent experiments to execute.  Must be positive.
+    spectral_max_time, spectral_trials, spectral_seed:
+        Parameters forwarded to :func:`collect_unification_dynamics` to control
+        the spectral-dimension estimation inside each summary.  When
+        ``spectral_seed`` is provided, successive replicates increment it to
+        avoid identical random walks in each run.
+
+    Returns
+    -------
+    Dict[str, float]
+        Aggregate statistics that highlight whether discrete growth, causal
+        layering, and emergent geometry remain consistent across runs.
+    """
+
+    if steps <= 0:
+        raise ValueError("steps must be positive")
+    if replicates <= 0:
+        raise ValueError("replicates must be positive")
+
+    final_nodes: List[float] = []
+    final_edges: List[float] = []
+    final_unity: List[float] = []
+    final_discretization: List[float] = []
+    final_depths: List[float] = []
+    growth_rates: List[float] = []
+    unity_means: List[float] = []
+    coherence_values: List[float] = []
+    correlations: List[float] = []
+
+    for replicate in range(replicates):
+        engine = engine_factory()
+        seed = spectral_seed + replicate if spectral_seed is not None else None
+        history = collect_unification_dynamics(
+            engine,
+            steps,
+            include_initial=True,
+            spectral_max_time=spectral_max_time,
+            spectral_trials=spectral_trials,
+            spectral_seed=seed,
+        )
+        if not history:
+            continue
+
+        initial = history[0]
+        final = history[-1]
+
+        final_nodes.append(float(final.get("node_count", float("nan"))))
+        final_edges.append(float(final.get("edge_count", float("nan"))))
+        final_unity.append(float(final.get("unity_consistency", float("nan"))))
+        final_discretization.append(
+            float(final.get("discretization_index", float("nan")))
+        )
+        final_depths.append(float(final.get("causal_max_depth", float("nan"))))
+
+        node_span = float(final.get("node_count", 0.0) - initial.get("node_count", 0.0))
+        event_span = float(
+            final.get("event_count", 0.0) - initial.get("event_count", 0.0)
+        )
+        growth_rates.append(_safe_ratio(node_span, event_span))
+
+        unity_values = [
+            float(entry.get("unity_consistency", float("nan"))) for entry in history
+        ]
+        unity_means.append(_finite_average(unity_values))
+
+        normalized_depths: List[float] = []
+        for entry in history:
+            depth = float(entry.get("causal_max_depth", float("nan")))
+            events = float(entry.get("event_count", 0.0))
+            normalized = depth / (1.0 + events)
+            normalized_depths.append(
+                normalized if math.isfinite(normalized) else float("nan")
+            )
+
+        coherence_components = [
+            float(entry.get("unity_consistency", float("nan"))) * normalized
+            for entry, normalized in zip(history, normalized_depths)
+        ]
+        coherence_values.append(_finite_average(coherence_components))
+
+        pairs = _collect_pairs(
+            history,
+            "discretization_index",
+            "unity_consistency",
+        )
+        correlations.append(_pearson_from_pairs(pairs))
+
+    unity_variance = _finite_variance(final_unity)
+    discretization_variance = _finite_variance(final_discretization)
+    if math.isfinite(discretization_variance):
+        discretization_stability = 1.0 / (1.0 + discretization_variance)
+    else:
+        discretization_stability = float("nan")
+
+    return {
+        "replicates": float(len(final_nodes)),
+        "mean_final_node_count": _finite_average(final_nodes),
+        "mean_final_edge_count": _finite_average(final_edges),
+        "mean_final_unity": _finite_average(final_unity),
+        "unity_variance": unity_variance,
+        "discretization_stability": discretization_stability,
+        "mean_causal_depth": _finite_average(final_depths),
+        "mean_growth_rate": _finite_average(growth_rates),
+        "mean_unity_integral": _finite_average(unity_means),
+        "trajectory_coherence": _finite_average(coherence_values),
+        "mean_discrete_geometric_correlation": _finite_average(correlations),
+    }
+
+
 __all__ = [
     "compute_unification_summary",
     "collect_unification_dynamics",
     "generate_unification_certificate",
     "derive_unification_principles",
+    "assess_unification_robustness",
 ]

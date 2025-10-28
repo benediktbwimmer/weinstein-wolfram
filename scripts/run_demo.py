@@ -13,6 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from engine.hypergraph import Hypergraph
 from engine.rewrite import EdgeSplit3Rule, RewriteEngine
 from metrics import (
+    assess_unification_robustness,
     compute_unification_summary,
     mean_forman_curvature,
     spectral_dimension,
@@ -58,6 +59,34 @@ def main() -> None:
                 display = str(int(round(value)))
             else:
                 display = f"{value:.6f}"
+        else:
+            display = "NaN"
+        print(f"    {key}: {display}")
+
+    class Factory:
+        def __init__(self) -> None:
+            self.seed = 10
+
+        def __call__(self) -> RewriteEngine:
+            hg = Hypergraph([(0, 1, 2)])
+            engine = RewriteEngine(hg, EdgeSplit3Rule(), seed=self.seed)
+            self.seed += 1
+            return engine
+
+    robustness = assess_unification_robustness(
+        Factory(),
+        steps=60,
+        replicates=4,
+        spectral_max_time=4,
+        spectral_trials=200,
+        spectral_seed=5,
+    )
+
+    print("  Robustness across replicates:")
+    for key in sorted(robustness.keys()):
+        value = robustness[key]
+        if value == value:
+            display = f"{value:.6f}"
         else:
             display = "NaN"
         print(f"    {key}: {display}")
