@@ -12,7 +12,12 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from engine.hypergraph import Hypergraph
 from engine.rewrite import EdgeSplit3Rule, RewriteEngine
-from metrics import mean_forman_curvature, spectral_dimension, summarize_causal_graph
+from metrics import (
+    compute_unification_summary,
+    mean_forman_curvature,
+    spectral_dimension,
+    summarize_causal_graph,
+)
 
 
 def main() -> None:
@@ -25,6 +30,12 @@ def main() -> None:
     ds = spectral_dimension(skeleton, max_time=6, trials=400, seed=2)
     curvature = mean_forman_curvature(skeleton)
     causal_stats = summarize_causal_graph(engine.causal_graph)
+    unified = compute_unification_summary(
+        engine,
+        spectral_max_time=6,
+        spectral_trials=400,
+        spectral_seed=3,
+    )
 
     print("Final hypergraph state:")
     print(f"  Nodes: {hypergraph.node_count}")
@@ -39,6 +50,17 @@ def main() -> None:
         print("  Mean Forman curvature: NaN")
     print("  Causal statistics:")
     pprint(causal_stats)
+    print("  Unified summary:")
+    for key in sorted(unified.keys()):
+        value = unified[key]
+        if value == value:
+            if abs(value - round(value)) < 1e-9:
+                display = str(int(round(value)))
+            else:
+                display = f"{value:.6f}"
+        else:
+            display = "NaN"
+        print(f"    {key}: {display}")
 
 
 if __name__ == "__main__":
