@@ -6,7 +6,11 @@ import pytest
 
 from engine.hypergraph import Hypergraph
 from engine.rewrite import EdgeSplit3Rule, RewriteEngine
-from metrics import collect_unification_dynamics, compute_unification_summary
+from metrics import (
+    collect_unification_dynamics,
+    compute_unification_summary,
+    generate_unification_certificate,
+)
 from metrics.geom import (
     average_clustering_coefficient,
     mean_forman_curvature,
@@ -88,3 +92,22 @@ def test_collect_unification_dynamics_requires_non_negative_steps() -> None:
     engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=9)
     with pytest.raises(ValueError):
         collect_unification_dynamics(engine, steps=-1)
+
+
+def test_generate_unification_certificate_reports_bridge_metrics() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=5)
+    certificate = generate_unification_certificate(
+        engine,
+        steps=18,
+        spectral_max_time=4,
+        spectral_trials=60,
+        spectral_seed=13,
+    )
+    dual = certificate["dual_correlation"]
+    synergy = certificate["causal_synergy"]
+    strength = certificate["certificate_strength"]
+
+    assert 0.0 <= dual <= 1.0000001
+    assert synergy > 0
+    assert strength > 0

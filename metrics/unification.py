@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Dict, List
+import math
+from typing import Callable, Dict, Iterable, List, Sequence, Tuple
 
 from engine.rewrite import RewriteEngine
 
@@ -13,10 +14,55 @@ from .geom import (
 )
 
 
+MetricTransform = Callable[[float, Dict[str, float]], float]
+
+
 def _safe_ratio(numerator: float, denominator: float) -> float:
     if denominator == 0:
         return float("nan")
     return numerator / denominator
+
+
+def _collect_pairs(
+    entries: Iterable[Dict[str, float]],
+    x_key: str,
+    y_key: str,
+    *,
+    x_transform: MetricTransform | None = None,
+    y_transform: MetricTransform | None = None,
+) -> List[Tuple[float, float]]:
+    pairs: List[Tuple[float, float]] = []
+    for entry in entries:
+        x_raw = entry.get(x_key)
+        y_raw = entry.get(y_key)
+        if x_raw is None or y_raw is None:
+            continue
+        x_val = float(x_raw)
+        y_val = float(y_raw)
+        if not math.isfinite(x_val) or not math.isfinite(y_val):
+            continue
+        if x_transform is not None:
+            x_val = x_transform(x_val, entry)
+        if y_transform is not None:
+            y_val = y_transform(y_val, entry)
+        if math.isfinite(x_val) and math.isfinite(y_val):
+            pairs.append((x_val, y_val))
+    return pairs
+
+
+def _pearson_from_pairs(pairs: Sequence[Tuple[float, float]]) -> float:
+    if len(pairs) < 2:
+        return float("nan")
+    xs = [p[0] for p in pairs]
+    ys = [p[1] for p in pairs]
+    mean_x = sum(xs) / len(xs)
+    mean_y = sum(ys) / len(ys)
+    var_x = sum((x - mean_x) ** 2 for x in xs)
+    var_y = sum((y - mean_y) ** 2 for y in ys)
+    if var_x <= 0 or var_y <= 0:
+        return float("nan")
+    cov = sum((x - mean_x) * (y - mean_y) for x, y in pairs)
+    return cov / math.sqrt(var_x * var_y)
 
 
 def compute_unification_summary(
@@ -145,4 +191,77 @@ def collect_unification_dynamics(
     return summaries
 
 
-__all__ = ["compute_unification_summary", "collect_unification_dynamics"]
+def generate_unification_certificate(
+    engine: RewriteEngine,
+    steps: int,
+    *,
+    spectral_max_time: int = 6,
+    spectral_trials: int = 200,
+    spectral_seed: int | None = None,
+) -> Dict[str, float]:
+    """Construct a software proof-of-concept for unity between formalisms.
+
+    The returned dictionary highlights how discrete growth, causal structure,
+    and emergent geometry interplay in a single scalar summary:
+
+    * ``dual_correlation`` captures a Pearson correlation between the
+      ``unity_consistency`` observable and the inverse of the
+      ``discretization_index``.  A positive value indicates that as the system
+      accumulates discrete complexity, the effective geometric observable reacts
+      in a predictable complementary fashion.
+    * ``causal_synergy`` reports the average product of ``unity_consistency``
+      with a normalized causal depth (depth divided by the number of executed
+      events).  This measures how geometric regularity co-varies with causal
+      layering.
+    * ``certificate_strength`` multiplies the first two measures, offering a
+      compact scalar that is positive whenever the two modes of interaction are
+      mutually reinforcing.
+    """
+
+    history = collect_unification_dynamics(
+        engine,
+        steps,
+        include_initial=True,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=spectral_seed,
+    )
+
+    dual_pairs = _collect_pairs(
+        history,
+        "discretization_index",
+        "unity_consistency",
+        x_transform=lambda value, _: 1.0 / (1.0 + value),
+    )
+    dual_correlation = _pearson_from_pairs(dual_pairs)
+
+    causal_pairs = _collect_pairs(
+        history,
+        "causal_max_depth",
+        "unity_consistency",
+        x_transform=lambda depth, entry: depth
+        / (1.0 + float(entry.get("event_count", 0.0))),
+    )
+    causal_synergy = (
+        sum(x * y for x, y in causal_pairs) / len(causal_pairs)
+        if causal_pairs
+        else float("nan")
+    )
+
+    if math.isfinite(dual_correlation) and math.isfinite(causal_synergy):
+        certificate_strength = dual_correlation * causal_synergy
+    else:
+        certificate_strength = float("nan")
+
+    return {
+        "dual_correlation": dual_correlation,
+        "causal_synergy": causal_synergy,
+        "certificate_strength": certificate_strength,
+    }
+
+
+__all__ = [
+    "compute_unification_summary",
+    "collect_unification_dynamics",
+    "generate_unification_certificate",
+]

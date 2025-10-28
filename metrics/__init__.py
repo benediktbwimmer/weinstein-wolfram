@@ -6,7 +6,11 @@ from .geom import (
     spectral_dimension,
 )
 from .causal import summarize_causal_graph
-from .unification import collect_unification_dynamics, compute_unification_summary
+from .unification import (
+    collect_unification_dynamics,
+    compute_unification_summary,
+    generate_unification_certificate,
+)
 
 __all__ = [
     "spectral_dimension",
@@ -15,4 +19,5 @@ __all__ = [
     "summarize_causal_graph",
     "compute_unification_summary",
     "collect_unification_dynamics",
+    "generate_unification_certificate",
 ]
