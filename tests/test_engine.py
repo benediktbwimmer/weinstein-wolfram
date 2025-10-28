@@ -18,6 +18,7 @@ from metrics import (
     derive_unification_principles,
     evaluate_unification_alignment,
     generate_unification_certificate,
+    map_unification_resonance,
     run_toy_unification_model,
 )
 from metrics.geom import (
@@ -365,3 +366,42 @@ def test_construct_unification_landscape_validates_inputs() -> None:
         construct_unification_landscape(engine, steps=1, sample_interval=0)
     with pytest.raises(ValueError):
         construct_unification_landscape(engine, steps=1, multiway_generations=-1)
+
+
+def test_map_unification_resonance_profiles_depth_response() -> None:
+    def factory() -> RewriteEngine:
+        hypergraph = Hypergraph([(0, 1, 2)])
+        return RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=61)
+
+    result = map_unification_resonance(
+        factory,
+        steps=4,
+        multiway_depths=[0, 1, 2],
+        spectral_max_time=2,
+        spectral_trials=20,
+        spectral_seed=71,
+    )
+
+    assert result["depths_evaluated"] == 3.0
+    assert result["depth_span"] == 2.0
+    mean_unity = result["mean_unity_consistency"]
+    assert math.isnan(mean_unity) or math.isfinite(mean_unity)
+    mean_frontier = result["mean_frontier_size"]
+    assert math.isnan(mean_frontier) or math.isfinite(mean_frontier)
+    mean_causal = result["mean_causal_depth"]
+    assert math.isnan(mean_causal) or math.isfinite(mean_causal)
+    resonance = result["resonance_score"]
+    assert resonance >= 0 or math.isnan(resonance)
+
+
+def test_map_unification_resonance_validates_inputs() -> None:
+    def factory() -> RewriteEngine:
+        hypergraph = Hypergraph([(0, 1, 2)])
+        return RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=73)
+
+    with pytest.raises(ValueError):
+        map_unification_resonance(factory, steps=0, multiway_depths=[0])
+    with pytest.raises(ValueError):
+        map_unification_resonance(factory, steps=1, multiway_depths=[])
+    with pytest.raises(ValueError):
+        map_unification_resonance(factory, steps=1, multiway_depths=[-1])
