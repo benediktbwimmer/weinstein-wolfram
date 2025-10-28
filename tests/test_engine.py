@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from engine.hypergraph import Hypergraph
 from engine.rewrite import EdgeSplit3Rule, RewriteEngine
-from metrics import compute_unification_summary
+from metrics import collect_unification_dynamics, compute_unification_summary
 from metrics.geom import mean_forman_curvature, spectral_dimension
 
 
@@ -45,3 +47,34 @@ def test_unification_summary_blends_metrics() -> None:
     assert summary["information_density"] == summary["information_density"]
     assert summary["unity_consistency"] == summary["unity_consistency"]
     assert summary["causal_max_depth"] >= 0
+
+
+def test_collect_unification_dynamics_tracks_growth() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=7)
+    history = collect_unification_dynamics(
+        engine,
+        steps=4,
+        spectral_max_time=4,
+        spectral_trials=40,
+        spectral_seed=11,
+    )
+
+    assert len(history) == 5  # initial snapshot + four new events
+    event_counts = [entry["event_count"] for entry in history]
+    assert event_counts == [float(i) for i in range(5)]
+
+    node_counts = [entry["node_count"] for entry in history]
+    assert node_counts[0] < node_counts[-1]
+    for earlier, later in zip(node_counts, node_counts[1:]):
+        assert later >= earlier
+
+    final_unity = history[-1]["unity_consistency"]
+    assert final_unity == final_unity  # not NaN
+
+
+def test_collect_unification_dynamics_requires_non_negative_steps() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=9)
+    with pytest.raises(ValueError):
+        collect_unification_dynamics(engine, steps=-1)
