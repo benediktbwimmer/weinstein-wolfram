@@ -12,6 +12,7 @@ from .unification import (
     assess_unification_robustness,
     collect_unification_dynamics,
     derive_unification_principles,
+    evaluate_unification_alignment,
     generate_unification_certificate,
 )
 
@@ -24,6 +25,7 @@ class ToyModelResult:
     final_summary: Dict[str, float]
     certificate: Dict[str, float]
     principles: Dict[str, float]
+    alignment: Dict[str, float]
     robustness: Dict[str, float]
 
 
@@ -101,10 +103,19 @@ def run_toy_unification_model(
         spectral_seed=seed + 2,
     )
 
+    alignment_engine = make_engine(seed + 3)
+    alignment = evaluate_unification_alignment(
+        alignment_engine,
+        steps=steps,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=seed + 3,
+    )
+
     def factory_generator() -> "Factory":
         class Factory:
             def __init__(self) -> None:
-                self._next_seed = seed + 3
+                self._next_seed = seed + 4
 
             def __call__(self) -> RewriteEngine:
                 engine = make_engine(self._next_seed)
@@ -119,7 +130,7 @@ def run_toy_unification_model(
         replicates=replicates,
         spectral_max_time=spectral_max_time,
         spectral_trials=spectral_trials,
-        spectral_seed=seed + 3,
+        spectral_seed=seed + 4,
     )
 
     return ToyModelResult(
@@ -127,6 +138,7 @@ def run_toy_unification_model(
         final_summary=final_summary,
         certificate=certificate,
         principles=principles,
+        alignment=alignment,
         robustness=robustness,
     )
 
