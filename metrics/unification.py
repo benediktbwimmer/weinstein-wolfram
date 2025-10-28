@@ -23,6 +23,21 @@ def _safe_ratio(numerator: float, denominator: float) -> float:
     return numerator / denominator
 
 
+def _finite_average(values: Sequence[float]) -> float:
+    finite_values = [value for value in values if math.isfinite(value)]
+    if not finite_values:
+        return float("nan")
+    return sum(finite_values) / len(finite_values)
+
+
+def _finite_variance(values: Sequence[float]) -> float:
+    finite_values = [value for value in values if math.isfinite(value)]
+    if len(finite_values) < 2:
+        return float("nan")
+    mean = sum(finite_values) / len(finite_values)
+    return sum((value - mean) ** 2 for value in finite_values) / len(finite_values)
+
+
 def _collect_pairs(
     entries: Iterable[Dict[str, float]],
     x_key: str,
@@ -260,8 +275,106 @@ def generate_unification_certificate(
     }
 
 
+def derive_unification_principles(
+    engine: RewriteEngine,
+    steps: int,
+    *,
+    spectral_max_time: int = 6,
+    spectral_trials: int = 200,
+    spectral_seed: int | None = None,
+) -> Dict[str, float]:
+    """Extract first-principles indicators that blend discrete and geometric views.
+
+    The returned dictionary focuses on three foundational quantities:
+
+    * ``growth_rate`` captures how quickly the hypergraph accumulates nodes per
+      executed event.  This reflects the discrete substrate of the rewrite
+      system.
+    * ``causal_alignment`` averages how normalized causal depth correlates with
+      the unity observable, revealing how causal layering resonates with
+      geometry.
+    * ``geometric_balance`` compares the average clustering coefficient against
+      the magnitude of mean Forman curvature, estimating whether emergent
+      geometry maintains coherence as the system grows.
+    * ``unity_stability`` measures the inverse variance of the unity observable
+      across the collected history, with values in ``(0, 1]`` indicating stable
+      behaviour.
+    """
+
+    if steps <= 0:
+        raise ValueError("steps must be positive")
+
+    history = collect_unification_dynamics(
+        engine,
+        steps,
+        include_initial=True,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=spectral_seed,
+    )
+
+    if len(history) < 2:
+        return {
+            "growth_rate": float("nan"),
+            "causal_alignment": float("nan"),
+            "geometric_balance": float("nan"),
+            "unity_stability": float("nan"),
+        }
+
+    first = history[0]
+    last = history[-1]
+
+    event_span = float(last.get("event_count", 0.0) - first.get("event_count", 0.0))
+    node_span = float(last.get("node_count", 0.0) - first.get("node_count", 0.0))
+    growth_rate = _safe_ratio(node_span, event_span)
+
+    unity_values = [float(entry.get("unity_consistency", float("nan"))) for entry in history]
+    unity_average = _finite_average(unity_values)
+
+    normalized_depths: List[float] = []
+    for entry in history:
+        depth = float(entry.get("causal_max_depth", float("nan")))
+        events = float(entry.get("event_count", 0.0))
+        normalized = depth / (1.0 + events)
+        normalized_depths.append(normalized if math.isfinite(normalized) else float("nan"))
+
+    if math.isfinite(unity_average):
+        products = [
+            float(entry.get("unity_consistency", float("nan"))) * normalized
+            for entry, normalized in zip(history, normalized_depths)
+        ]
+        causal_alignment = _finite_average(products)
+    else:
+        causal_alignment = float("nan")
+
+    clustering_values = [float(entry.get("mean_clustering_coefficient", float("nan"))) for entry in history]
+    curvature_values = [float(entry.get("mean_forman_curvature", float("nan"))) for entry in history]
+
+    avg_clustering = _finite_average(clustering_values)
+    avg_curvature = _finite_average(curvature_values)
+
+    if math.isfinite(avg_clustering) and math.isfinite(avg_curvature):
+        geometric_balance = avg_clustering / (1.0 + abs(avg_curvature))
+    else:
+        geometric_balance = float("nan")
+
+    variance_unity = _finite_variance(unity_values)
+    if math.isfinite(variance_unity):
+        unity_stability = 1.0 / (1.0 + variance_unity)
+    else:
+        unity_stability = float("nan")
+
+    return {
+        "growth_rate": growth_rate,
+        "causal_alignment": causal_alignment,
+        "geometric_balance": geometric_balance,
+        "unity_stability": unity_stability,
+    }
+
+
 __all__ = [
     "compute_unification_summary",
     "collect_unification_dynamics",
     "generate_unification_certificate",
+    "derive_unification_principles",
 ]
