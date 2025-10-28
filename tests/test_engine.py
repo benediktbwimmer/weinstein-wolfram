@@ -9,11 +9,13 @@ import pytest
 from engine.hypergraph import Hypergraph
 from engine.rewrite import EdgeSplit3Rule, RewriteEngine
 from metrics import (
+    ToyModelResult,
     assess_unification_robustness,
     collect_unification_dynamics,
     compute_unification_summary,
     derive_unification_principles,
     generate_unification_certificate,
+    run_toy_unification_model,
 )
 from metrics.geom import (
     average_clustering_coefficient,
@@ -204,3 +206,23 @@ def test_assess_unification_robustness_validates_parameters() -> None:
         assess_unification_robustness(factory, steps=0)
     with pytest.raises(ValueError):
         assess_unification_robustness(factory, steps=1, replicates=0)
+
+
+def test_run_toy_unification_model_produces_bridge_metrics() -> None:
+    result = run_toy_unification_model(
+        steps=6,
+        replicates=2,
+        spectral_max_time=3,
+        spectral_trials=40,
+        seed=42,
+    )
+
+    assert isinstance(result, ToyModelResult)
+    assert len(result.history) == 7
+    assert result.history[0]["event_count"] == 0.0
+    assert result.history[-1]["event_count"] == float(6)
+    assert result.final_summary == result.history[-1]
+    assert result.certificate["certificate_strength"] > 0
+    assert result.principles["growth_rate"] > 0
+    assert result.robustness["replicates"] == 2.0
+    assert result.robustness["mean_final_unity"] == result.robustness["mean_final_unity"]

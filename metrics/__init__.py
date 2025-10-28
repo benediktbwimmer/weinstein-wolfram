@@ -13,6 +13,7 @@ from .unification import (
     derive_unification_principles,
     generate_unification_certificate,
 )
+from .toy import ToyModelResult, run_toy_unification_model
 
 __all__ = [
     "spectral_dimension",
@@ -24,4 +25,6 @@ __all__ = [
     "generate_unification_certificate",
     "derive_unification_principles",
     "assess_unification_robustness",
+    "ToyModelResult",
+    "run_toy_unification_model",
 ]
