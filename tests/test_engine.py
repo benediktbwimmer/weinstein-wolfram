@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from engine.hypergraph import Hypergraph
 from engine.rewrite import EdgeSplit3Rule, RewriteEngine
 from metrics import (
+    assess_unification_robustness,
     collect_unification_dynamics,
     compute_unification_summary,
     derive_unification_principles,
@@ -136,3 +139,48 @@ def test_derive_unification_principles_requires_positive_steps() -> None:
     engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=21)
     with pytest.raises(ValueError):
         derive_unification_principles(engine, steps=0)
+
+
+def test_assess_unification_robustness_aggregates_replicates() -> None:
+    class Factory:
+        def __init__(self) -> None:
+            self.seed = 30
+
+        def __call__(self) -> RewriteEngine:
+            hg = Hypergraph([(0, 1, 2)])
+            engine = RewriteEngine(hg, EdgeSplit3Rule(), seed=self.seed)
+            self.seed += 1
+            return engine
+
+    result = assess_unification_robustness(
+        Factory(),
+        steps=6,
+        replicates=4,
+        spectral_max_time=4,
+        spectral_trials=60,
+        spectral_seed=7,
+    )
+
+    assert result["replicates"] == 4.0
+    assert result["mean_final_node_count"] > 3
+    assert result["mean_final_edge_count"] > 1
+    assert result["mean_final_unity"] == result["mean_final_unity"]
+    assert result["unity_variance"] >= 0 or math.isnan(result["unity_variance"])
+    assert 0.0 < result["discretization_stability"] <= 1.0
+    assert result["mean_growth_rate"] > 0
+    assert result["trajectory_coherence"] == result["trajectory_coherence"]
+    assert (
+        result["mean_discrete_geometric_correlation"]
+        == result["mean_discrete_geometric_correlation"]
+    )
+
+
+def test_assess_unification_robustness_validates_parameters() -> None:
+    def factory() -> RewriteEngine:
+        hg = Hypergraph([(0, 1, 2)])
+        return RewriteEngine(hg, EdgeSplit3Rule(), seed=0)
+
+    with pytest.raises(ValueError):
+        assess_unification_robustness(factory, steps=0)
+    with pytest.raises(ValueError):
+        assess_unification_robustness(factory, steps=1, replicates=0)

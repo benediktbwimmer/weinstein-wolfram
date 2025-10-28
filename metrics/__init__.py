@@ -7,6 +7,7 @@ from .geom import (
 )
 from .causal import summarize_causal_graph
 from .unification import (
+    assess_unification_robustness,
     collect_unification_dynamics,
     compute_unification_summary,
     derive_unification_principles,
@@ -22,4 +23,5 @@ __all__ = [
     "collect_unification_dynamics",
     "generate_unification_certificate",
     "derive_unification_principles",
+    "assess_unification_robustness",
 ]
