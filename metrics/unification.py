@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, List
 
 from engine.rewrite import RewriteEngine
 
@@ -86,4 +86,57 @@ def compute_unification_summary(
     return summary
 
 
-__all__ = ["compute_unification_summary"]
+def collect_unification_dynamics(
+    engine: RewriteEngine,
+    steps: int,
+    *,
+    include_initial: bool = True,
+    spectral_max_time: int = 6,
+    spectral_trials: int = 200,
+    spectral_seed: int | None = None,
+) -> List[Dict[str, float]]:
+    """Track how the unification summary evolves over multiple rewrite steps.
+
+    Parameters
+    ----------
+    engine:
+        The rewrite engine whose state will be advanced in-place.
+    steps:
+        Number of rewrite steps to execute.
+    include_initial:
+        If ``True`` (the default), the summary before any additional rewrites
+        are applied is included as the first element of the returned list.
+    spectral_max_time, spectral_trials, spectral_seed:
+        Parameters forwarded to :func:`compute_unification_summary` for
+        spectral-dimension estimation.
+    """
+
+    if steps < 0:
+        raise ValueError("steps must be non-negative")
+
+    summaries: List[Dict[str, float]] = []
+    if include_initial:
+        summaries.append(
+            compute_unification_summary(
+                engine,
+                spectral_max_time=spectral_max_time,
+                spectral_trials=spectral_trials,
+                spectral_seed=spectral_seed,
+            )
+        )
+
+    for _ in range(steps):
+        engine.step()
+        summaries.append(
+            compute_unification_summary(
+                engine,
+                spectral_max_time=spectral_max_time,
+                spectral_trials=spectral_trials,
+                spectral_seed=spectral_seed,
+            )
+        )
+
+    return summaries
+
+
+__all__ = ["compute_unification_summary", "collect_unification_dynamics"]
