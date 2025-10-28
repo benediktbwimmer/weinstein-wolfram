@@ -87,6 +87,7 @@ def compute_unification_summary(
     spectral_max_time: int = 6,
     spectral_trials: int = 200,
     spectral_seed: int | None = None,
+    multiway_generations: int = 2,
 ) -> Dict[str, float]:
     """Return a dictionary connecting discrete rewrites to geometric structure.
 
@@ -103,8 +104,13 @@ def compute_unification_summary(
       when all applicable updates are explored in parallel.
 
     The dictionary values are floats for ease of downstream analysis and may be
-    ``NaN`` when a metric is undefined.
+    ``NaN`` when a metric is undefined.  The ``multiway_generations`` parameter
+    controls how deep the auxiliary multiway exploration proceeds when
+    computing the branching-based observables.
     """
+
+    if multiway_generations < 0:
+        raise ValueError("multiway_generations must be non-negative")
 
     hypergraph = engine.hypergraph
     skeleton = hypergraph.one_skeleton()
@@ -154,7 +160,7 @@ def compute_unification_summary(
     }
 
     multiway = MultiwaySystem(hypergraph.copy(), [engine.rule])
-    evolution = multiway.run(max_generations=2)
+    evolution = multiway.run(max_generations=multiway_generations)
     histogram = evolution.depth_histogram()
     max_depth = max(histogram.keys(), default=0)
     frontier_size = len(evolution.frontier(max_depth)) if histogram else 1
@@ -181,6 +187,7 @@ def collect_unification_dynamics(
     spectral_max_time: int = 6,
     spectral_trials: int = 200,
     spectral_seed: int | None = None,
+    multiway_generations: int = 2,
 ) -> List[Dict[str, float]]:
     """Track how the unification summary evolves over multiple rewrite steps.
 
@@ -200,6 +207,9 @@ def collect_unification_dynamics(
     spectral_max_time, spectral_trials, spectral_seed:
         Parameters forwarded to :func:`compute_unification_summary` for
         spectral-dimension estimation.
+    multiway_generations:
+        Maximum depth explored when summarizing the auxiliary multiway
+        evolution.  A value of ``0`` restricts the summary to the initial state.
     """
 
     if steps < 0:
@@ -215,6 +225,7 @@ def collect_unification_dynamics(
                 spectral_max_time=spectral_max_time,
                 spectral_trials=spectral_trials,
                 spectral_seed=spectral_seed,
+                multiway_generations=multiway_generations,
             )
         )
 
@@ -229,6 +240,7 @@ def collect_unification_dynamics(
                 spectral_max_time=spectral_max_time,
                 spectral_trials=spectral_trials,
                 spectral_seed=spectral_seed,
+                multiway_generations=multiway_generations,
             )
         )
         remaining -= batch
@@ -243,6 +255,7 @@ def generate_unification_certificate(
     spectral_max_time: int = 6,
     spectral_trials: int = 200,
     spectral_seed: int | None = None,
+    multiway_generations: int = 2,
 ) -> Dict[str, float]:
     """Construct a software proof-of-concept for unity between formalisms.
 
@@ -261,6 +274,10 @@ def generate_unification_certificate(
     * ``certificate_strength`` multiplies the first two measures, offering a
       compact scalar that is positive whenever the two modes of interaction are
       mutually reinforcing.
+    The optional ``multiway_generations`` argument mirrors the corresponding
+    parameter of :func:`compute_unification_summary`, enabling deeper or shallower
+    explorations of the auxiliary branching structure that informs the
+    certificate.
     """
 
     history = collect_unification_dynamics(
@@ -270,6 +287,7 @@ def generate_unification_certificate(
         spectral_max_time=spectral_max_time,
         spectral_trials=spectral_trials,
         spectral_seed=spectral_seed,
+        multiway_generations=multiway_generations,
     )
 
     dual_pairs = _collect_pairs(
@@ -312,6 +330,7 @@ def derive_unification_principles(
     spectral_max_time: int = 6,
     spectral_trials: int = 200,
     spectral_seed: int | None = None,
+    multiway_generations: int = 2,
 ) -> Dict[str, float]:
     """Extract first-principles indicators that blend discrete and geometric views.
 
@@ -329,6 +348,9 @@ def derive_unification_principles(
     * ``unity_stability`` measures the inverse variance of the unity observable
       across the collected history, with values in ``(0, 1]`` indicating stable
       behaviour.
+    The ``multiway_generations`` parameter is forwarded to
+    :func:`collect_unification_dynamics` and consequently influences the
+    branching observables available for downstream aggregation.
     """
 
     if steps <= 0:
@@ -341,6 +363,7 @@ def derive_unification_principles(
         spectral_max_time=spectral_max_time,
         spectral_trials=spectral_trials,
         spectral_seed=spectral_seed,
+        multiway_generations=multiway_generations,
     )
 
     if len(history) < 2:
@@ -409,8 +432,13 @@ def evaluate_unification_alignment(
     spectral_max_time: int = 6,
     spectral_trials: int = 200,
     spectral_seed: int | None = None,
+    multiway_generations: int = 2,
 ) -> Dict[str, float]:
     """Quantify how discrete, causal, and geometric metrics evolve together."""
+
+    # ``multiway_generations`` is threaded through to
+    # :func:`collect_unification_dynamics` to allow callers to tune how deeply
+    # the multiway branching structure is sampled when computing each summary.
 
     if steps <= 0:
         raise ValueError("steps must be positive")
@@ -422,6 +450,7 @@ def evaluate_unification_alignment(
         spectral_max_time=spectral_max_time,
         spectral_trials=spectral_trials,
         spectral_seed=spectral_seed,
+        multiway_generations=multiway_generations,
     )
 
     if len(history) < 2:
@@ -514,6 +543,7 @@ def assess_unification_robustness(
     spectral_max_time: int = 6,
     spectral_trials: int = 200,
     spectral_seed: int | None = None,
+    multiway_generations: int = 2,
 ) -> Dict[str, float]:
     """Evaluate how reproducible the blended metrics are across runs.
 
@@ -532,6 +562,9 @@ def assess_unification_robustness(
         the spectral-dimension estimation inside each summary.  When
         ``spectral_seed`` is provided, successive replicates increment it to
         avoid identical random walks in each run.
+    multiway_generations:
+        The maximum depth explored when constructing the auxiliary multiway
+        summaries used for each replicate.
 
     Returns
     -------
@@ -565,6 +598,7 @@ def assess_unification_robustness(
             spectral_max_time=spectral_max_time,
             spectral_trials=spectral_trials,
             spectral_seed=seed,
+            multiway_generations=multiway_generations,
         )
         if not history:
             continue
@@ -635,6 +669,104 @@ def assess_unification_robustness(
     }
 
 
+def construct_unification_landscape(
+    engine: RewriteEngine,
+    steps: int,
+    *,
+    sample_interval: int = 1,
+    spectral_max_time: int = 6,
+    spectral_trials: int = 200,
+    spectral_seed: int | None = None,
+    multiway_generations: int = 2,
+) -> Dict[str, float]:
+    """Synthesize a coarse landscape describing multiway/discrete interplay.
+
+    The returned dictionary aggregates time series statistics that highlight how
+    the size of the multiway frontier evolves relative to causal depth and the
+    unity observable.  The function reuses :func:`collect_unification_dynamics`
+    to obtain snapshots and compresses them into a handful of descriptive
+    scalars suitable for dashboards or further analysis.
+    """
+
+    if steps <= 0:
+        raise ValueError("steps must be positive")
+    if sample_interval <= 0:
+        raise ValueError("sample_interval must be positive")
+    if multiway_generations < 0:
+        raise ValueError("multiway_generations must be non-negative")
+
+    history = collect_unification_dynamics(
+        engine,
+        steps,
+        include_initial=True,
+        sample_interval=sample_interval,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=spectral_seed,
+        multiway_generations=multiway_generations,
+    )
+
+    if not history:
+        return {
+            "history_length": 0.0,
+            "layered_frontier_mean": float("nan"),
+            "layered_frontier_growth": float("nan"),
+            "multiway_depth_range": float("nan"),
+            "unity_frontier_correlation": float("nan"),
+            "multiway_generations": float(multiway_generations),
+        }
+
+    frontier_values = [
+        float(entry.get("multiway_frontier_size", float("nan"))) for entry in history
+    ]
+    depth_values = [
+        float(entry.get("multiway_max_depth", float("nan"))) for entry in history
+    ]
+    event_counts = [float(entry.get("event_count", 0.0)) for entry in history]
+
+    layered_frontier_mean = _finite_average(frontier_values)
+
+    first_frontier = next(
+        (value for value in frontier_values if math.isfinite(value)),
+        float("nan"),
+    )
+    last_frontier = next(
+        (
+            value
+            for value in reversed(frontier_values)
+            if math.isfinite(value)
+        ),
+        float("nan"),
+    )
+    event_span = event_counts[-1] - event_counts[0]
+    if math.isfinite(first_frontier) and math.isfinite(last_frontier):
+        layered_frontier_growth = _safe_ratio(last_frontier - first_frontier, event_span)
+    else:
+        layered_frontier_growth = float("nan")
+
+    finite_depths = [value for value in depth_values if math.isfinite(value)]
+    if finite_depths:
+        multiway_depth_range = max(finite_depths) - min(finite_depths)
+    else:
+        multiway_depth_range = float("nan")
+
+    frontier_pairs = _collect_pairs(
+        history,
+        "multiway_frontier_size",
+        "unity_consistency",
+    )
+    unity_frontier_correlation = _pearson_from_pairs(frontier_pairs)
+
+    return {
+        "history_length": float(len(history)),
+        "layered_frontier_mean": layered_frontier_mean,
+        "layered_frontier_growth": layered_frontier_growth,
+        "multiway_depth_range": multiway_depth_range,
+        "unity_frontier_correlation": unity_frontier_correlation,
+        "multiway_generations": float(multiway_generations),
+    }
+
+
 __all__ = [
     "compute_unification_summary",
     "collect_unification_dynamics",
@@ -642,4 +774,5 @@ __all__ = [
     "derive_unification_principles",
     "assess_unification_robustness",
     "evaluate_unification_alignment",
+    "construct_unification_landscape",
 ]
