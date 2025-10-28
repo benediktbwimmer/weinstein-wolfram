@@ -669,6 +669,130 @@ def assess_unification_robustness(
     }
 
 
+def map_unification_resonance(
+    engine_factory: Callable[[], RewriteEngine],
+    *,
+    steps: int,
+    multiway_depths: Sequence[int],
+    spectral_max_time: int = 6,
+    spectral_trials: int = 200,
+    spectral_seed: int | None = None,
+) -> Dict[str, float]:
+    """Survey how multiway exploration depth modulates blended observables.
+
+    For each entry in ``multiway_depths`` the factory is invoked to produce a
+    fresh engine which is then advanced for ``steps`` rewrites while recording
+    the unification summary.  The resulting dictionary aggregates statistics
+    that describe how the unity observable, average multiway frontier size, and
+    causal depth respond to progressively deeper explorations of the auxiliary
+    multiway system.  Correlation coefficients against the requested depth act
+    as coarse resonance indicators between Wolfram-style growth and Weinstein's
+    geometric cues.
+    """
+
+    if steps <= 0:
+        raise ValueError("steps must be positive")
+    if not multiway_depths:
+        raise ValueError("multiway_depths must not be empty")
+    if any(depth < 0 for depth in multiway_depths):
+        raise ValueError("multiway_depths must be non-negative")
+
+    depth_values: List[float] = []
+    unity_means: List[float] = []
+    frontier_means: List[float] = []
+    frontier_gradients: List[float] = []
+    causal_depths: List[float] = []
+
+    for index, depth in enumerate(multiway_depths):
+        engine = engine_factory()
+        seed = spectral_seed + index if spectral_seed is not None else None
+        history = collect_unification_dynamics(
+            engine,
+            steps,
+            include_initial=True,
+            spectral_max_time=spectral_max_time,
+            spectral_trials=spectral_trials,
+            spectral_seed=seed,
+            multiway_generations=depth,
+        )
+        if not history:
+            continue
+
+        depth_values.append(float(depth))
+
+        unity_series = [
+            float(entry.get("unity_consistency", float("nan"))) for entry in history
+        ]
+        frontier_series = [
+            float(entry.get("multiway_frontier_size", float("nan"))) for entry in history
+        ]
+        causal_series = [
+            float(entry.get("causal_max_depth", float("nan"))) for entry in history
+        ]
+        event_counts = [float(entry.get("event_count", 0.0)) for entry in history]
+
+        unity_means.append(_finite_average(unity_series))
+        frontier_means.append(_finite_average(frontier_series))
+        causal_depths.append(float(history[-1].get("causal_max_depth", float("nan"))))
+
+        first_frontier = next(
+            (value for value in frontier_series if math.isfinite(value)),
+            float("nan"),
+        )
+        last_frontier = next(
+            (
+                value
+                for value in reversed(frontier_series)
+                if math.isfinite(value)
+            ),
+            float("nan"),
+        )
+        event_span = event_counts[-1] - event_counts[0]
+        if math.isfinite(first_frontier) and math.isfinite(last_frontier):
+            frontier_gradients.append(
+                _safe_ratio(last_frontier - first_frontier, event_span)
+            )
+        else:
+            frontier_gradients.append(float("nan"))
+
+    def _pairs(depths: Sequence[float], values: Sequence[float]) -> List[Tuple[float, float]]:
+        pairs: List[Tuple[float, float]] = []
+        for depth, value in zip(depths, values):
+            if math.isfinite(depth) and math.isfinite(value):
+                pairs.append((float(depth), float(value)))
+        return pairs
+
+    unity_corr = _pearson_from_pairs(_pairs(depth_values, unity_means))
+    frontier_corr = _pearson_from_pairs(_pairs(depth_values, frontier_means))
+    causal_corr = _pearson_from_pairs(_pairs(depth_values, causal_depths))
+
+    alignment_components = [
+        abs(value)
+        for value in (unity_corr, frontier_corr, causal_corr)
+        if math.isfinite(value)
+    ]
+    resonance_score = _finite_average(alignment_components)
+
+    depth_span = (
+        max(depth_values) - min(depth_values)
+        if depth_values and len(depth_values) > 1
+        else 0.0 if depth_values else float("nan")
+    )
+
+    return {
+        "depths_evaluated": float(len(depth_values)),
+        "depth_span": float(depth_span),
+        "mean_unity_consistency": _finite_average(unity_means),
+        "mean_frontier_size": _finite_average(frontier_means),
+        "mean_frontier_gradient": _finite_average(frontier_gradients),
+        "mean_causal_depth": _finite_average(causal_depths),
+        "unity_depth_correlation": unity_corr,
+        "frontier_depth_correlation": frontier_corr,
+        "causal_depth_correlation": causal_corr,
+        "resonance_score": resonance_score,
+    }
+
+
 def construct_unification_landscape(
     engine: RewriteEngine,
     steps: int,
@@ -774,5 +898,6 @@ __all__ = [
     "derive_unification_principles",
     "assess_unification_robustness",
     "evaluate_unification_alignment",
+    "map_unification_resonance",
     "construct_unification_landscape",
 ]
