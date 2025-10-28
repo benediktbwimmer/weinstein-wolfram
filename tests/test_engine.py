@@ -7,7 +7,11 @@ import pytest
 from engine.hypergraph import Hypergraph
 from engine.rewrite import EdgeSplit3Rule, RewriteEngine
 from metrics import collect_unification_dynamics, compute_unification_summary
-from metrics.geom import mean_forman_curvature, spectral_dimension
+from metrics.geom import (
+    average_clustering_coefficient,
+    mean_forman_curvature,
+    spectral_dimension,
+)
 
 
 def test_rewrite_engine_grows_hypergraph() -> None:
@@ -28,8 +32,10 @@ def test_geometric_metrics_return_values() -> None:
     skeleton = hypergraph.one_skeleton()
     ds = spectral_dimension(skeleton, max_time=4, trials=200, seed=2)
     curvature = mean_forman_curvature(skeleton)
+    clustering = average_clustering_coefficient(skeleton)
     assert ds == ds  # not NaN
     assert curvature == curvature  # not NaN
+    assert clustering == clustering  # not NaN
 
 
 def test_unification_summary_blends_metrics() -> None:
@@ -47,6 +53,7 @@ def test_unification_summary_blends_metrics() -> None:
     assert summary["information_density"] == summary["information_density"]
     assert summary["unity_consistency"] == summary["unity_consistency"]
     assert summary["causal_max_depth"] >= 0
+    assert summary["mean_clustering_coefficient"] == summary["mean_clustering_coefficient"]
 
 
 def test_collect_unification_dynamics_tracks_growth() -> None:
@@ -71,6 +78,9 @@ def test_collect_unification_dynamics_tracks_growth() -> None:
 
     final_unity = history[-1]["unity_consistency"]
     assert final_unity == final_unity  # not NaN
+    assert history[-1]["mean_clustering_coefficient"] == history[-1][
+        "mean_clustering_coefficient"
+    ]
 
 
 def test_collect_unification_dynamics_requires_non_negative_steps() -> None:
