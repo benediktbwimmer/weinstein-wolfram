@@ -1040,6 +1040,220 @@ def synthesize_unification_attractor(
     }
 
 
+def compose_unification_manifest(
+    engine_factory: Callable[[], RewriteEngine],
+    *,
+    steps: int,
+    replicates: int = 3,
+    spectral_max_time: int = 6,
+    spectral_trials: int = 200,
+    spectral_seed: int | None = None,
+    multiway_generations: int = 2,
+    sample_interval: int = 1,
+    window: int = 4,
+) -> Dict[str, float]:
+    """Fuse multiple bridge metrics into a unified manifest of observables.
+
+    The manifest aggregates the terminal values of the unification summary,
+    certificate, alignment, principles, landscape, and attractor channels over
+    several independent replicates supplied by ``engine_factory``.  Each
+    replicate uses a fresh :class:`~engine.rewrite.RewriteEngine` instance,
+    ensuring that stochastic rewrite choices do not leak across measurements.
+
+    Parameters
+    ----------
+    engine_factory:
+        Callable returning a brand-new engine whenever invoked.  The hypergraph
+        within the engine is mutated in-place during the computation and must
+        therefore not be reused across replicates.
+    steps:
+        Number of rewrite steps explored for each replicate.  Must be
+        positive.
+    replicates:
+        Number of independent replicates to aggregate.  Must be positive.
+    spectral_max_time, spectral_trials, spectral_seed:
+        Parameters forwarded to the spectral-dimension estimators inside the
+        downstream metrics.  When ``spectral_seed`` is provided, successive
+        replicates increment it to avoid identical random walks.
+    multiway_generations:
+        Maximum depth explored when constructing auxiliary multiway summaries.
+        The value is forwarded to all downstream helper functions.
+    sample_interval:
+        Sampling cadence used when constructing landscape summaries.  Must be
+        positive.
+    window:
+        Sliding-window length employed by the attractor synthesis.  Must be
+        positive.
+
+    Returns
+    -------
+    Dict[str, float]
+        Aggregate statistics highlighting how discrete growth (Wolfram) and
+        geometric regularity (Weinstein) cohere across the supplied replicates.
+    """
+
+    if steps <= 0:
+        raise ValueError("steps must be positive")
+    if replicates <= 0:
+        raise ValueError("replicates must be positive")
+    if sample_interval <= 0:
+        raise ValueError("sample_interval must be positive")
+    if window <= 0:
+        raise ValueError("window must be positive")
+
+    unity_values: List[float] = []
+    discretization_values: List[float] = []
+    certificate_strengths: List[float] = []
+    dual_correlations: List[float] = []
+    alignment_scores: List[float] = []
+    growth_rates: List[float] = []
+    geometric_balances: List[float] = []
+    geometric_resonances: List[float] = []
+    causal_gradients: List[float] = []
+    multiway_pressures: List[float] = []
+    frontier_correlations: List[float] = []
+    frontier_growths: List[float] = []
+
+    for replicate in range(replicates):
+        seed = spectral_seed + replicate if spectral_seed is not None else None
+
+        history_engine = engine_factory()
+        history = collect_unification_dynamics(
+            history_engine,
+            steps,
+            include_initial=True,
+            spectral_max_time=spectral_max_time,
+            spectral_trials=spectral_trials,
+            spectral_seed=seed,
+            multiway_generations=multiway_generations,
+        )
+        final_summary = history[-1] if history else {}
+        unity_values.append(float(final_summary.get("unity_consistency", float("nan"))))
+        discretization_values.append(
+            float(final_summary.get("discretization_index", float("nan")))
+        )
+
+        certificate_engine = engine_factory()
+        certificate = generate_unification_certificate(
+            certificate_engine,
+            steps,
+            spectral_max_time=spectral_max_time,
+            spectral_trials=spectral_trials,
+            spectral_seed=seed,
+            multiway_generations=multiway_generations,
+        )
+        certificate_strengths.append(
+            float(certificate.get("certificate_strength", float("nan")))
+        )
+        dual_correlations.append(float(certificate.get("dual_correlation", float("nan"))))
+
+        alignment_engine = engine_factory()
+        alignment = evaluate_unification_alignment(
+            alignment_engine,
+            steps,
+            spectral_max_time=spectral_max_time,
+            spectral_trials=spectral_trials,
+            spectral_seed=seed,
+            multiway_generations=multiway_generations,
+        )
+        alignment_scores.append(float(alignment.get("alignment_score", float("nan"))))
+
+        principles_engine = engine_factory()
+        principles = derive_unification_principles(
+            principles_engine,
+            steps,
+            spectral_max_time=spectral_max_time,
+            spectral_trials=spectral_trials,
+            spectral_seed=seed,
+            multiway_generations=multiway_generations,
+        )
+        growth_rates.append(float(principles.get("growth_rate", float("nan"))))
+        geometric_balances.append(float(principles.get("geometric_balance", float("nan"))))
+
+        attractor_engine = engine_factory()
+        attractor = synthesize_unification_attractor(
+            attractor_engine,
+            steps,
+            window=window,
+            spectral_max_time=spectral_max_time,
+            spectral_trials=spectral_trials,
+            spectral_seed=seed,
+            multiway_generations=multiway_generations,
+        )
+        geometric_resonances.append(float(attractor.get("geometric_resonance", float("nan"))))
+        causal_gradients.append(float(attractor.get("causal_gradient", float("nan"))))
+        multiway_pressures.append(float(attractor.get("multiway_pressure", float("nan"))))
+
+        landscape_engine = engine_factory()
+        landscape = construct_unification_landscape(
+            landscape_engine,
+            steps,
+            sample_interval=sample_interval,
+            spectral_max_time=spectral_max_time,
+            spectral_trials=spectral_trials,
+            spectral_seed=seed,
+            multiway_generations=multiway_generations,
+        )
+        frontier_correlations.append(
+            float(landscape.get("unity_frontier_correlation", float("nan")))
+        )
+        frontier_growths.append(float(landscape.get("layered_frontier_growth", float("nan"))))
+
+    unity_certificate_pairs = [
+        (u, c)
+        for u, c in zip(unity_values, certificate_strengths)
+        if math.isfinite(u) and math.isfinite(c)
+    ]
+    discretization_pressure_pairs = [
+        (d, p)
+        for d, p in zip(discretization_values, multiway_pressures)
+        if math.isfinite(d) and math.isfinite(p)
+    ]
+    frontier_alignment_pairs = [
+        (f, a)
+        for f, a in zip(frontier_growths, alignment_scores)
+        if math.isfinite(f) and math.isfinite(a)
+    ]
+
+    mean_certificate_strength = _finite_average(certificate_strengths)
+    mean_alignment_score = _finite_average(alignment_scores)
+    mean_geometric_resonance = _finite_average(geometric_resonances)
+    mean_multiway_pressure = _finite_average(multiway_pressures)
+
+    concordance_components = [
+        abs(value)
+        for value in (
+            mean_certificate_strength,
+            mean_alignment_score,
+            mean_geometric_resonance,
+            mean_multiway_pressure,
+        )
+        if math.isfinite(value)
+    ]
+
+    return {
+        "replicates": float(replicates),
+        "mean_unity_consistency": _finite_average(unity_values),
+        "mean_discretization_index": _finite_average(discretization_values),
+        "mean_certificate_strength": mean_certificate_strength,
+        "mean_dual_correlation": _finite_average(dual_correlations),
+        "mean_alignment_score": mean_alignment_score,
+        "mean_growth_rate": _finite_average(growth_rates),
+        "mean_geometric_balance": _finite_average(geometric_balances),
+        "mean_geometric_resonance": mean_geometric_resonance,
+        "mean_causal_gradient": _finite_average(causal_gradients),
+        "mean_multiway_pressure": mean_multiway_pressure,
+        "mean_unity_frontier_correlation": _finite_average(frontier_correlations),
+        "mean_frontier_growth": _finite_average(frontier_growths),
+        "unity_certificate_correlation": _pearson_from_pairs(unity_certificate_pairs),
+        "discretization_pressure_correlation": _pearson_from_pairs(
+            discretization_pressure_pairs
+        ),
+        "frontier_alignment_correlation": _pearson_from_pairs(frontier_alignment_pairs),
+        "concordance_index": _finite_average(concordance_components),
+    }
+
+
 __all__ = [
     "compute_unification_summary",
     "collect_unification_dynamics",
@@ -1050,4 +1264,5 @@ __all__ = [
     "map_unification_resonance",
     "construct_unification_landscape",
     "synthesize_unification_attractor",
+    "compose_unification_manifest",
 ]

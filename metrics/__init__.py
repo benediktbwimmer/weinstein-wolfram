@@ -9,6 +9,7 @@ from .causal import summarize_causal_graph
 from .unification import (
     assess_unification_robustness,
     collect_unification_dynamics,
+    compose_unification_manifest,
     construct_unification_landscape,
     compute_unification_summary,
     derive_unification_principles,
@@ -33,6 +34,7 @@ __all__ = [
     "evaluate_unification_alignment",
     "map_unification_resonance",
     "synthesize_unification_attractor",
+    "compose_unification_manifest",
     "ToyModelResult",
     "run_toy_unification_model",
 ]
