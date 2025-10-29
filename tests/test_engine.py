@@ -22,6 +22,7 @@ from metrics import (
     analyze_unification_feedback,
     map_unification_resonance,
     synthesize_unification_attractor,
+    harmonize_unification_channels,
     run_toy_unification_model,
 )
 from metrics.geom import (
@@ -465,6 +466,43 @@ def test_analyze_unification_feedback_requires_positive_steps() -> None:
     engine = RewriteEngine(Hypergraph([(0, 1, 2)]), EdgeSplit3Rule(), seed=127)
     with pytest.raises(ValueError):
         analyze_unification_feedback(engine, steps=0)
+
+
+def test_harmonize_unification_channels_fuses_correlated_views() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=139)
+    harmony = harmonize_unification_channels(
+        engine,
+        steps=9,
+        spectral_max_time=4,
+        spectral_trials=60,
+        spectral_seed=149,
+        multiway_generations=2,
+    )
+
+    for key in (
+        "unity_flux",
+        "geometric_causal_ratio",
+        "branching_intensity",
+        "discrete_unity_correlation",
+        "causal_unity_correlation",
+        "geometric_frontier_correlation",
+        "coherence_index",
+    ):
+        assert key in harmony
+
+    flux = harmony["unity_flux"]
+    assert math.isnan(flux) or math.isfinite(flux)
+    intensity = harmony["branching_intensity"]
+    assert math.isnan(intensity) or intensity >= 0
+    coherence = harmony["coherence_index"]
+    assert math.isnan(coherence) or 0.0 <= coherence <= 1.0000001
+
+
+def test_harmonize_unification_channels_requires_positive_steps() -> None:
+    engine = RewriteEngine(Hypergraph([(0, 1, 2)]), EdgeSplit3Rule(), seed=151)
+    with pytest.raises(ValueError):
+        harmonize_unification_channels(engine, steps=0)
 
 
 def test_synthesize_unification_attractor_fuses_sliding_metrics() -> None:

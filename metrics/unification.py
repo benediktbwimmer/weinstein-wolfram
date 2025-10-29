@@ -1372,6 +1372,153 @@ def compose_unification_manifest(
     }
 
 
+def harmonize_unification_channels(
+    engine: RewriteEngine,
+    steps: int,
+    *,
+    spectral_max_time: int = 6,
+    spectral_trials: int = 200,
+    spectral_seed: int | None = None,
+    multiway_generations: int = 2,
+) -> Dict[str, float]:
+    """Blend discrete, causal, geometric, and multiway cues into harmony metrics.
+
+    The returned dictionary exposes coarse indicators that summarize how the
+    computational (Wolfram) and geometric (Weinstein) perspectives co-evolve
+    during a rewrite experiment.  Four complementary measurements are
+    provided:
+
+    ``unity_flux``
+        Finite-difference estimate of the unity observable's drift per executed
+        event.
+    ``geometric_causal_ratio``
+        Ratio comparing mean Forman curvature against the average normalized
+        causal depth, highlighting the balance between curvature and causal
+        layering.
+    ``branching_intensity``
+        Average multiway frontier size normalized by the mean number of
+        executed events, representing the pressure contributed by multiway
+        branching.
+    ``coherence_index``
+        Mean absolute correlation across three channel pairs (discrete vs
+        unity, causal vs unity, geometric vs frontier) used as a global harmony
+        score.
+
+    Individual correlations backing the ``coherence_index`` are included in the
+    result for downstream inspection.  The ``multiway_generations`` argument is
+    forwarded to :func:`collect_unification_dynamics`, allowing callers to tune
+    how deeply the auxiliary branching structure is explored while computing
+    the harmony metrics.
+    """
+
+    if steps <= 0:
+        raise ValueError("steps must be positive")
+
+    history = collect_unification_dynamics(
+        engine,
+        steps,
+        include_initial=True,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=spectral_seed,
+        multiway_generations=multiway_generations,
+    )
+
+    if len(history) < 2:
+        return {
+            "unity_flux": float("nan"),
+            "geometric_causal_ratio": float("nan"),
+            "branching_intensity": float("nan"),
+            "discrete_unity_correlation": float("nan"),
+            "causal_unity_correlation": float("nan"),
+            "geometric_frontier_correlation": float("nan"),
+            "coherence_index": float("nan"),
+        }
+
+    first = history[0]
+    last = history[-1]
+
+    initial_unity = float(first.get("unity_consistency", float("nan")))
+    final_unity = float(last.get("unity_consistency", float("nan")))
+    event_span = float(last.get("event_count", 0.0) - first.get("event_count", 0.0))
+    if math.isfinite(initial_unity) and math.isfinite(final_unity):
+        unity_flux = _safe_ratio(final_unity - initial_unity, event_span)
+    else:
+        unity_flux = float("nan")
+
+    curvature_series = [
+        float(entry.get("mean_forman_curvature", float("nan"))) for entry in history
+    ]
+    normalized_depths: List[float] = []
+    for entry in history:
+        depth = float(entry.get("causal_max_depth", float("nan")))
+        events = float(entry.get("event_count", 0.0))
+        normalized = depth / (1.0 + events)
+        normalized_depths.append(normalized if math.isfinite(normalized) else float("nan"))
+
+    mean_curvature = _finite_average(curvature_series)
+    mean_normalized_depth = _finite_average(normalized_depths)
+    if math.isfinite(mean_curvature) and math.isfinite(mean_normalized_depth):
+        geometric_causal_ratio = mean_curvature / (1.0 + mean_normalized_depth)
+    else:
+        geometric_causal_ratio = float("nan")
+
+    frontier_series = [
+        float(entry.get("multiway_frontier_size", float("nan"))) for entry in history
+    ]
+    event_series = [float(entry.get("event_count", 0.0)) for entry in history]
+    frontier_average = _finite_average(frontier_series)
+    event_average = _finite_average(event_series)
+    if math.isfinite(frontier_average) and math.isfinite(event_average):
+        branching_intensity = _safe_ratio(frontier_average, 1.0 + event_average)
+    else:
+        branching_intensity = float("nan")
+
+    discrete_pairs = _collect_pairs(
+        history,
+        "discretization_index",
+        "unity_consistency",
+    )
+    discrete_unity_correlation = _pearson_from_pairs(discrete_pairs)
+
+    causal_pairs = _collect_pairs(
+        history,
+        "causal_max_depth",
+        "unity_consistency",
+        x_transform=lambda depth, entry: depth
+        / (1.0 + float(entry.get("event_count", 0.0))),
+    )
+    causal_unity_correlation = _pearson_from_pairs(causal_pairs)
+
+    geometric_pairs = _collect_pairs(
+        history,
+        "mean_forman_curvature",
+        "multiway_frontier_size",
+    )
+    geometric_frontier_correlation = _pearson_from_pairs(geometric_pairs)
+
+    coherence_components = [
+        abs(value)
+        for value in (
+            discrete_unity_correlation,
+            causal_unity_correlation,
+            geometric_frontier_correlation,
+        )
+        if math.isfinite(value)
+    ]
+    coherence_index = _finite_average(coherence_components)
+
+    return {
+        "unity_flux": unity_flux,
+        "geometric_causal_ratio": geometric_causal_ratio,
+        "branching_intensity": branching_intensity,
+        "discrete_unity_correlation": discrete_unity_correlation,
+        "causal_unity_correlation": causal_unity_correlation,
+        "geometric_frontier_correlation": geometric_frontier_correlation,
+        "coherence_index": coherence_index,
+    }
+
+
 __all__ = [
     "compute_unification_summary",
     "collect_unification_dynamics",
@@ -1384,4 +1531,5 @@ __all__ = [
     "synthesize_unification_attractor",
     "compose_unification_manifest",
     "analyze_unification_feedback",
+    "harmonize_unification_channels",
 ]
