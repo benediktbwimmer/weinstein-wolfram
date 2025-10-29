@@ -23,6 +23,7 @@ from metrics import (
     map_unification_resonance,
     synthesize_unification_attractor,
     harmonize_unification_channels,
+    orchestrate_unification_symphony,
     trace_unification_phase_portrait,
     run_toy_unification_model,
 )
@@ -308,6 +309,18 @@ def test_run_toy_unification_model_produces_bridge_metrics() -> None:
     assert math.isnan(result.feedback["spectral_equilibrium"]) or 0.0 < result.feedback[
         "spectral_equilibrium"
     ] <= 1.0
+    assert set(result.symphony) == {
+        "unity_momentum",
+        "discrete_curvature_correlation",
+        "causal_frontier_correlation",
+        "spectral_unity_correlation",
+        "multiway_resilience",
+        "windowed_unity_variance",
+        "symphony_score",
+    }
+    assert math.isnan(result.symphony["symphony_score"]) or result.symphony[
+        "symphony_score"
+    ] >= 0
     assert set(result.attractor) == {
         "discrete_persistence",
         "geometric_resonance",
@@ -515,6 +528,49 @@ def test_harmonize_unification_channels_requires_positive_steps() -> None:
     engine = RewriteEngine(Hypergraph([(0, 1, 2)]), EdgeSplit3Rule(), seed=151)
     with pytest.raises(ValueError):
         harmonize_unification_channels(engine, steps=0)
+
+
+def test_orchestrate_unification_symphony_fuses_correlations() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=187)
+    symphony = orchestrate_unification_symphony(
+        engine,
+        steps=8,
+        window=3,
+        spectral_max_time=4,
+        spectral_trials=60,
+        spectral_seed=193,
+        multiway_generations=2,
+    )
+
+    assert set(symphony) == {
+        "unity_momentum",
+        "discrete_curvature_correlation",
+        "causal_frontier_correlation",
+        "spectral_unity_correlation",
+        "multiway_resilience",
+        "windowed_unity_variance",
+        "symphony_score",
+    }
+
+    assert math.isnan(symphony["unity_momentum"]) or math.isfinite(
+        symphony["unity_momentum"]
+    )
+    assert math.isnan(symphony["windowed_unity_variance"]) or symphony[
+        "windowed_unity_variance"
+    ] >= 0
+    assert math.isnan(symphony["multiway_resilience"]) or symphony[
+        "multiway_resilience"
+    ] >= 0
+    assert math.isnan(symphony["symphony_score"]) or symphony["symphony_score"] >= 0
+
+
+def test_orchestrate_unification_symphony_validates_inputs() -> None:
+    engine = RewriteEngine(Hypergraph([(0, 1, 2)]), EdgeSplit3Rule(), seed=199)
+    with pytest.raises(ValueError):
+        orchestrate_unification_symphony(engine, steps=0)
+    with pytest.raises(ValueError):
+        orchestrate_unification_symphony(engine, steps=1, window=0)
 
 
 def test_synthesize_unification_attractor_fuses_sliding_metrics() -> None:

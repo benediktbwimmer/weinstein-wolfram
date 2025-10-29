@@ -1519,6 +1519,159 @@ def harmonize_unification_channels(
     }
 
 
+def orchestrate_unification_symphony(
+    engine: RewriteEngine,
+    steps: int,
+    *,
+    window: int = 3,
+    spectral_max_time: int = 6,
+    spectral_trials: int = 200,
+    spectral_seed: int | None = None,
+    multiway_generations: int = 2,
+) -> Dict[str, float]:
+    """Fuse cross-channel correlations into a synthetic symphony score.
+
+    The symphony aggregates differential, correlational, and resilience-based
+    observables that track how Wolfram-style discrete growth resonates with
+    Weinstein-inspired geometric cues.  The returned dictionary contains:
+
+    ``unity_momentum``
+        Average finite-difference drift of the unity observable per executed
+        event.
+    ``discrete_curvature_correlation``
+        Pearson correlation between the discretization index and mean Forman
+        curvature.
+    ``causal_frontier_correlation``
+        Pearson correlation between normalized causal depth and the multiway
+        frontier size.
+    ``spectral_unity_correlation``
+        Pearson correlation between spectral dimension and the unity
+        observable.
+    ``multiway_resilience``
+        Average ratio of frontier size to (1 + multiway max depth), capturing
+        how branching pressure disperses across layers.
+    ``windowed_unity_variance``
+        Mean variance of the unity observable across sliding windows of length
+        ``window``.
+    ``symphony_score``
+        Average absolute correlation across the discrete/curvature, causal/
+        frontier, and spectral/unity channel pairings.
+
+    The ``window`` parameter must be positive and is clipped to the available
+    history length when computing sliding-window statistics.  The
+    ``multiway_generations`` argument matches
+    :func:`collect_unification_dynamics`, controlling the auxiliary branching
+    exploration depth.
+    """
+
+    if steps <= 0:
+        raise ValueError("steps must be positive")
+    if window <= 0:
+        raise ValueError("window must be positive")
+
+    history = collect_unification_dynamics(
+        engine,
+        steps,
+        include_initial=True,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=spectral_seed,
+        multiway_generations=multiway_generations,
+    )
+
+    if len(history) < 2:
+        return {
+            "unity_momentum": float("nan"),
+            "discrete_curvature_correlation": float("nan"),
+            "causal_frontier_correlation": float("nan"),
+            "spectral_unity_correlation": float("nan"),
+            "multiway_resilience": float("nan"),
+            "windowed_unity_variance": float("nan"),
+            "symphony_score": float("nan"),
+        }
+
+    unity_series = [
+        float(entry.get("unity_consistency", float("nan"))) for entry in history
+    ]
+    event_series = [float(entry.get("event_count", 0.0)) for entry in history]
+
+    momentum_components: List[float] = []
+    for previous, current, prev_events, curr_events in zip(
+        unity_series,
+        unity_series[1:],
+        event_series,
+        event_series[1:],
+    ):
+        if math.isfinite(previous) and math.isfinite(current):
+            delta_events = curr_events - prev_events
+            if delta_events > 0:
+                momentum = (current - previous) / delta_events
+                if math.isfinite(momentum):
+                    momentum_components.append(momentum)
+    unity_momentum = _finite_average(momentum_components)
+
+    discrete_curvature_pairs = _collect_pairs(
+        history,
+        "discretization_index",
+        "mean_forman_curvature",
+    )
+    discrete_curvature_correlation = _pearson_from_pairs(discrete_curvature_pairs)
+
+    causal_frontier_pairs = _collect_pairs(
+        history,
+        "causal_max_depth",
+        "multiway_frontier_size",
+        x_transform=lambda depth, entry: depth
+        / (1.0 + float(entry.get("event_count", 0.0))),
+    )
+    causal_frontier_correlation = _pearson_from_pairs(causal_frontier_pairs)
+
+    spectral_unity_pairs = _collect_pairs(
+        history,
+        "spectral_dimension",
+        "unity_consistency",
+    )
+    spectral_unity_correlation = _pearson_from_pairs(spectral_unity_pairs)
+
+    resilience_components: List[float] = []
+    for entry in history:
+        frontier = float(entry.get("multiway_frontier_size", float("nan")))
+        depth = float(entry.get("multiway_max_depth", float("nan")))
+        if math.isfinite(frontier) and math.isfinite(depth):
+            resilience = frontier / (1.0 + depth)
+            if math.isfinite(resilience):
+                resilience_components.append(resilience)
+    multiway_resilience = _finite_average(resilience_components)
+
+    window_size = min(window, len(history))
+    window_variances: List[float] = []
+    for start in range(len(history) - window_size + 1):
+        segment = unity_series[start : start + window_size]
+        window_variances.append(_finite_variance(segment))
+    windowed_unity_variance = _finite_average(window_variances)
+
+    symphony_components = [
+        abs(value)
+        for value in (
+            discrete_curvature_correlation,
+            causal_frontier_correlation,
+            spectral_unity_correlation,
+        )
+        if math.isfinite(value)
+    ]
+    symphony_score = _finite_average(symphony_components)
+
+    return {
+        "unity_momentum": unity_momentum,
+        "discrete_curvature_correlation": discrete_curvature_correlation,
+        "causal_frontier_correlation": causal_frontier_correlation,
+        "spectral_unity_correlation": spectral_unity_correlation,
+        "multiway_resilience": multiway_resilience,
+        "windowed_unity_variance": windowed_unity_variance,
+        "symphony_score": symphony_score,
+    }
+
+
 def trace_unification_phase_portrait(
     engine: RewriteEngine,
     steps: int,
@@ -1691,5 +1844,6 @@ __all__ = [
     "compose_unification_manifest",
     "analyze_unification_feedback",
     "harmonize_unification_channels",
+    "orchestrate_unification_symphony",
     "trace_unification_phase_portrait",
 ]
