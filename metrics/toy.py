@@ -11,6 +11,7 @@ from engine.rewrite import EdgeSplit3Rule, RewriteEngine
 from .unification import (
     assess_unification_robustness,
     collect_unification_dynamics,
+    compose_unification_manifest,
     construct_unification_landscape,
     derive_unification_principles,
     evaluate_unification_alignment,
@@ -29,6 +30,7 @@ class ToyModelResult:
     alignment: Dict[str, float]
     robustness: Dict[str, float]
     landscape: Dict[str, float]
+    manifest: Dict[str, float]
 
 
 def run_toy_unification_model(
@@ -157,6 +159,17 @@ def run_toy_unification_model(
         multiway_generations=multiway_generations,
     )
 
+    manifest_factory = factory_generator()
+    manifest = compose_unification_manifest(
+        manifest_factory,
+        steps=steps,
+        replicates=replicates,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=seed + 6,
+        multiway_generations=multiway_generations,
+    )
+
     return ToyModelResult(
         history=history,
         final_summary=final_summary,
@@ -165,6 +178,7 @@ def run_toy_unification_model(
         alignment=alignment,
         robustness=robustness,
         landscape=landscape,
+        manifest=manifest,
     )
 
 

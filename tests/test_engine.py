@@ -13,6 +13,7 @@ from metrics import (
     ToyModelResult,
     assess_unification_robustness,
     collect_unification_dynamics,
+    compose_unification_manifest,
     construct_unification_landscape,
     compute_unification_summary,
     derive_unification_principles,
@@ -300,6 +301,11 @@ def test_run_toy_unification_model_produces_bridge_metrics() -> None:
     assert math.isfinite(result.landscape["layered_frontier_mean"]) or math.isnan(
         result.landscape["layered_frontier_mean"]
     )
+    assert result.manifest["replicates"] == 2.0
+    assert "concordance_index" in result.manifest
+    assert result.manifest["mean_certificate_strength"] == result.manifest[
+        "mean_certificate_strength"
+    ]
 
 
 def test_compute_unification_summary_respects_multiway_generations() -> None:
@@ -441,3 +447,51 @@ def test_synthesize_unification_attractor_validates_inputs() -> None:
         synthesize_unification_attractor(engine, steps=0)
     with pytest.raises(ValueError):
         synthesize_unification_attractor(engine, steps=1, window=0)
+
+
+def test_compose_unification_manifest_consolidates_channels() -> None:
+    class Factory:
+        def __init__(self) -> None:
+            self.seed = 90
+
+        def __call__(self) -> RewriteEngine:
+            hypergraph = Hypergraph([(0, 1, 2)])
+            engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=self.seed)
+            self.seed += 1
+            return engine
+
+    manifest = compose_unification_manifest(
+        Factory(),
+        steps=4,
+        replicates=2,
+        spectral_max_time=2,
+        spectral_trials=20,
+        spectral_seed=91,
+        multiway_generations=2,
+        sample_interval=2,
+        window=2,
+    )
+
+    assert manifest["replicates"] == 2.0
+    assert "mean_unity_consistency" in manifest
+    assert "mean_alignment_score" in manifest
+    assert "unity_certificate_correlation" in manifest
+    corr = manifest["unity_certificate_correlation"]
+    assert math.isnan(corr) or -1.0 <= corr <= 1.0
+    concordance = manifest["concordance_index"]
+    assert math.isnan(concordance) or concordance >= 0
+
+
+def test_compose_unification_manifest_validates_inputs() -> None:
+    def factory() -> RewriteEngine:
+        hypergraph = Hypergraph([(0, 1, 2)])
+        return RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=101)
+
+    with pytest.raises(ValueError):
+        compose_unification_manifest(factory, steps=0)
+    with pytest.raises(ValueError):
+        compose_unification_manifest(factory, steps=1, replicates=0)
+    with pytest.raises(ValueError):
+        compose_unification_manifest(factory, steps=1, sample_interval=0)
+    with pytest.raises(ValueError):
+        compose_unification_manifest(factory, steps=1, window=0)
