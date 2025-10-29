@@ -1519,6 +1519,166 @@ def harmonize_unification_channels(
     }
 
 
+def calibrate_unification_compass(
+    engine: RewriteEngine,
+    steps: int,
+    *,
+    spectral_max_time: int = 6,
+    spectral_trials: int = 200,
+    spectral_seed: int | None = None,
+    multiway_generations: int = 2,
+) -> Dict[str, float]:
+    """Summarize directional drifts and correlations across observables.
+
+    The compass condenses how discrete growth, causal layering, geometric
+    regularity, and multiway branching co-vary as the rewrite system evolves.
+    Five finite-difference "drifts" measure the per-event change in
+    discretization index, unity consistency, normalized causal depth, multiway
+    frontier size, and spectral dimension between the start and end of the run.
+    These are complemented by correlation coefficients against executed events
+    and two aggregated coherence indicators:
+
+    ``compass_alignment``
+        Mean absolute correlation between executed events and each observable,
+        highlighting how tightly the channels co-move with the rewrite clock.
+    ``drift_magnitude``
+        Mean absolute value of the computed drifts, offering a coarse
+        indication of how strongly the observables respond during the run.
+
+    The ``multiway_generations`` parameter is forwarded to
+    :func:`collect_unification_dynamics`, allowing callers to control how
+    deeply the auxiliary branching structure is explored while constructing the
+    compass.
+    """
+
+    if steps <= 0:
+        raise ValueError("steps must be positive")
+
+    history = collect_unification_dynamics(
+        engine,
+        steps,
+        include_initial=True,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=spectral_seed,
+        multiway_generations=multiway_generations,
+    )
+
+    if len(history) < 2:
+        return {
+            "discrete_drift": float("nan"),
+            "unity_drift": float("nan"),
+            "causal_depth_drift": float("nan"),
+            "multiway_frontier_drift": float("nan"),
+            "spectral_drift": float("nan"),
+            "event_discrete_correlation": float("nan"),
+            "event_unity_correlation": float("nan"),
+            "event_causal_correlation": float("nan"),
+            "event_frontier_correlation": float("nan"),
+            "compass_alignment": float("nan"),
+            "drift_magnitude": float("nan"),
+        }
+
+    first = history[0]
+    last = history[-1]
+    event_span = float(last.get("event_count", 0.0) - first.get("event_count", 0.0))
+
+    def _drift(key: str) -> float:
+        start = float(first.get(key, float("nan")))
+        end = float(last.get(key, float("nan")))
+        if math.isfinite(start) and math.isfinite(end):
+            return _safe_ratio(end - start, event_span)
+        return float("nan")
+
+    def _normalized_depth(entry: Dict[str, float]) -> float:
+        depth = float(entry.get("causal_max_depth", float("nan")))
+        events = float(entry.get("event_count", 0.0))
+        normalized = depth / (1.0 + events)
+        return normalized if math.isfinite(normalized) else float("nan")
+
+    discrete_drift = _drift("discretization_index")
+    unity_drift = _drift("unity_consistency")
+
+    initial_depth = _normalized_depth(first)
+    final_depth = _normalized_depth(last)
+    if math.isfinite(initial_depth) and math.isfinite(final_depth):
+        causal_depth_drift = _safe_ratio(final_depth - initial_depth, event_span)
+    else:
+        causal_depth_drift = float("nan")
+
+    multiway_frontier_drift = _drift("multiway_frontier_size")
+    spectral_drift = _drift("spectral_dimension")
+
+    discrete_pairs = _collect_pairs(
+        history,
+        "event_count",
+        "discretization_index",
+    )
+    event_discrete_correlation = _pearson_from_pairs(discrete_pairs)
+
+    unity_pairs = _collect_pairs(
+        history,
+        "event_count",
+        "unity_consistency",
+    )
+    event_unity_correlation = _pearson_from_pairs(unity_pairs)
+
+    causal_pairs = _collect_pairs(
+        history,
+        "event_count",
+        "causal_max_depth",
+        y_transform=lambda depth, entry: depth
+        / (1.0 + float(entry.get("event_count", 0.0))),
+    )
+    event_causal_correlation = _pearson_from_pairs(causal_pairs)
+
+    frontier_pairs = _collect_pairs(
+        history,
+        "event_count",
+        "multiway_frontier_size",
+    )
+    event_frontier_correlation = _pearson_from_pairs(frontier_pairs)
+
+    alignment_components = [
+        abs(value)
+        for value in (
+            event_discrete_correlation,
+            event_unity_correlation,
+            event_causal_correlation,
+            event_frontier_correlation,
+        )
+        if math.isfinite(value)
+    ]
+    compass_alignment = _finite_average(alignment_components)
+
+    drift_components = [
+        abs(value)
+        for value in (
+            discrete_drift,
+            unity_drift,
+            causal_depth_drift,
+            multiway_frontier_drift,
+            spectral_drift,
+        )
+        if math.isfinite(value)
+    ]
+    drift_magnitude = _finite_average(drift_components)
+
+    return {
+        "discrete_drift": discrete_drift,
+        "unity_drift": unity_drift,
+        "causal_depth_drift": causal_depth_drift,
+        "multiway_frontier_drift": multiway_frontier_drift,
+        "spectral_drift": spectral_drift,
+        "event_discrete_correlation": event_discrete_correlation,
+        "event_unity_correlation": event_unity_correlation,
+        "event_causal_correlation": event_causal_correlation,
+        "event_frontier_correlation": event_frontier_correlation,
+        "compass_alignment": compass_alignment,
+        "drift_magnitude": drift_magnitude,
+    }
+
+
 def orchestrate_unification_symphony(
     engine: RewriteEngine,
     steps: int,
@@ -1845,5 +2005,6 @@ __all__ = [
     "analyze_unification_feedback",
     "harmonize_unification_channels",
     "orchestrate_unification_symphony",
+    "calibrate_unification_compass",
     "trace_unification_phase_portrait",
 ]
