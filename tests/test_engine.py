@@ -19,6 +19,7 @@ from metrics import (
     evaluate_unification_alignment,
     generate_unification_certificate,
     map_unification_resonance,
+    synthesize_unification_attractor,
     run_toy_unification_model,
 )
 from metrics.geom import (
@@ -405,3 +406,38 @@ def test_map_unification_resonance_validates_inputs() -> None:
         map_unification_resonance(factory, steps=1, multiway_depths=[])
     with pytest.raises(ValueError):
         map_unification_resonance(factory, steps=1, multiway_depths=[-1])
+
+
+def test_synthesize_unification_attractor_fuses_sliding_metrics() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=67)
+    attractor = synthesize_unification_attractor(
+        engine,
+        steps=6,
+        window=3,
+        spectral_max_time=2,
+        spectral_trials=30,
+        spectral_seed=79,
+        multiway_generations=2,
+    )
+
+    for key in (
+        "discrete_persistence",
+        "geometric_resonance",
+        "causal_gradient",
+        "multiway_pressure",
+    ):
+        assert key in attractor
+        value = attractor[key]
+        assert math.isnan(value) or math.isfinite(value)
+
+    finite_values = [value for value in attractor.values() if math.isfinite(value)]
+    assert finite_values  # ensure at least one channel produced a concrete value
+
+
+def test_synthesize_unification_attractor_validates_inputs() -> None:
+    engine = RewriteEngine(Hypergraph([(0, 1, 2)]), EdgeSplit3Rule(), seed=83)
+    with pytest.raises(ValueError):
+        synthesize_unification_attractor(engine, steps=0)
+    with pytest.raises(ValueError):
+        synthesize_unification_attractor(engine, steps=1, window=0)

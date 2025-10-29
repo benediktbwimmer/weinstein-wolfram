@@ -15,6 +15,7 @@ from .unification import (
     evaluate_unification_alignment,
     generate_unification_certificate,
     map_unification_resonance,
+    synthesize_unification_attractor,
 )
 from .toy import ToyModelResult, run_toy_unification_model
 
@@ -31,6 +32,7 @@ __all__ = [
     "assess_unification_robustness",
     "evaluate_unification_alignment",
     "map_unification_resonance",
+    "synthesize_unification_attractor",
     "ToyModelResult",
     "run_toy_unification_model",
 ]

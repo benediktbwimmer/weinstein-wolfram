@@ -891,6 +891,155 @@ def construct_unification_landscape(
     }
 
 
+def synthesize_unification_attractor(
+    engine: RewriteEngine,
+    steps: int,
+    *,
+    window: int = 4,
+    spectral_max_time: int = 6,
+    spectral_trials: int = 200,
+    spectral_seed: int | None = None,
+    multiway_generations: int = 2,
+) -> Dict[str, float]:
+    """Fuse sliding-window observables into a coarse unification attractor.
+
+    The attractor blends four complementary perspectives across a moving
+    observation window of summaries obtained via
+    :func:`collect_unification_dynamics`:
+
+    ``discrete_persistence``
+        Averaged gradient of the discretization index, capturing how reliably
+        the discrete substrate keeps growing.
+    ``geometric_resonance``
+        Mean product of unity consistency with the multiway frontier size,
+        standing in for a resonance between geometric cues and branching
+        richness.
+    ``causal_gradient``
+        Finite average of normalized causal depth gradients, measuring how
+        quickly causal layering thickens relative to executed events.
+    ``multiway_pressure``
+        Ratio of average frontier size to the average number of executed
+        events, highlighting the multiway contribution to the overall dynamical
+        pressure.
+
+    Parameters
+    ----------
+    engine:
+        Rewrite engine evolved in-place to gather summaries.
+    steps:
+        Number of rewrite steps to apply.  Must be positive.
+    window:
+        Sliding-window length when aggregating observables.  Must be positive.
+
+    The remaining keyword parameters mirror those of
+    :func:`collect_unification_dynamics`.
+    """
+
+    if steps <= 0:
+        raise ValueError("steps must be positive")
+    if window <= 0:
+        raise ValueError("window must be positive")
+
+    history = collect_unification_dynamics(
+        engine,
+        steps,
+        include_initial=True,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=spectral_seed,
+        multiway_generations=multiway_generations,
+    )
+
+    if len(history) < 2:
+        return {
+            "discrete_persistence": float("nan"),
+            "geometric_resonance": float("nan"),
+            "causal_gradient": float("nan"),
+            "multiway_pressure": float("nan"),
+        }
+
+    window_size = min(window, len(history))
+    discrete_gradients: List[float] = []
+    causal_gradients: List[float] = []
+    geometric_products: List[float] = []
+    multiway_pressures: List[float] = []
+
+    for start in range(len(history) - window_size + 1):
+        segment = history[start : start + window_size]
+        discretization_series = [
+            float(entry.get("discretization_index", float("nan")))
+            for entry in segment
+        ]
+        causal_series = [
+            float(entry.get("causal_max_depth", float("nan")))
+            for entry in segment
+        ]
+        unity_series = [
+            float(entry.get("unity_consistency", float("nan")))
+            for entry in segment
+        ]
+        frontier_series = [
+            float(entry.get("multiway_frontier_size", float("nan")))
+            for entry in segment
+        ]
+        event_series = [
+            float(entry.get("event_count", 0.0)) for entry in segment
+        ]
+
+        def _segment_gradient(series: Sequence[float]) -> float:
+            start_value = next(
+                (value for value in series if math.isfinite(value)),
+                float("nan"),
+            )
+            end_value = next(
+                (
+                    value
+                    for value in reversed(series)
+                    if math.isfinite(value)
+                ),
+                float("nan"),
+            )
+            if math.isfinite(start_value) and math.isfinite(end_value):
+                return _safe_ratio(
+                    end_value - start_value,
+                    float(max(1, len(series) - 1)),
+                )
+            return float("nan")
+
+        discrete_gradients.append(_segment_gradient(discretization_series))
+
+        normalized_causal = []
+        for depth, events in zip(causal_series, event_series):
+            if math.isfinite(depth):
+                normalized = depth / (1.0 + events)
+                normalized_causal.append(normalized if math.isfinite(normalized) else float("nan"))
+            else:
+                normalized_causal.append(float("nan"))
+        causal_gradients.append(_segment_gradient(normalized_causal))
+
+        unity_mean = _finite_average(unity_series)
+        frontier_mean = _finite_average(frontier_series)
+        if math.isfinite(unity_mean) and math.isfinite(frontier_mean):
+            geometric_products.append(unity_mean * frontier_mean)
+        else:
+            geometric_products.append(float("nan"))
+
+        frontier_average = _finite_average(frontier_series)
+        event_average = _finite_average(event_series)
+        multiway_pressures.append(
+            _safe_ratio(frontier_average, 1.0 + event_average)
+            if math.isfinite(frontier_average) and math.isfinite(event_average)
+            else float("nan")
+        )
+
+    return {
+        "discrete_persistence": _finite_average(discrete_gradients),
+        "geometric_resonance": _finite_average(geometric_products),
+        "causal_gradient": _finite_average(causal_gradients),
+        "multiway_pressure": _finite_average(multiway_pressures),
+    }
+
+
 __all__ = [
     "compute_unification_summary",
     "collect_unification_dynamics",
@@ -900,4 +1049,5 @@ __all__ = [
     "evaluate_unification_alignment",
     "map_unification_resonance",
     "construct_unification_landscape",
+    "synthesize_unification_attractor",
 ]
