@@ -19,6 +19,7 @@ from metrics import (
     derive_unification_principles,
     evaluate_unification_alignment,
     generate_unification_certificate,
+    analyze_unification_feedback,
     map_unification_resonance,
     synthesize_unification_attractor,
     run_toy_unification_model,
@@ -301,6 +302,10 @@ def test_run_toy_unification_model_produces_bridge_metrics() -> None:
     assert math.isfinite(result.landscape["layered_frontier_mean"]) or math.isnan(
         result.landscape["layered_frontier_mean"]
     )
+    assert "frontier_unity_correlation" in result.feedback
+    assert math.isnan(result.feedback["spectral_equilibrium"]) or 0.0 < result.feedback[
+        "spectral_equilibrium"
+    ] <= 1.0
     assert result.manifest["replicates"] == 2.0
     assert "concordance_index" in result.manifest
     assert result.manifest["mean_certificate_strength"] == result.manifest[
@@ -412,6 +417,41 @@ def test_map_unification_resonance_validates_inputs() -> None:
         map_unification_resonance(factory, steps=1, multiway_depths=[])
     with pytest.raises(ValueError):
         map_unification_resonance(factory, steps=1, multiway_depths=[-1])
+
+
+def test_analyze_unification_feedback_measures_loops() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=107)
+    feedback = analyze_unification_feedback(
+        engine,
+        steps=8,
+        spectral_max_time=4,
+        spectral_trials=60,
+        spectral_seed=113,
+        multiway_generations=2,
+    )
+
+    assert set(feedback) == {
+        "frontier_unity_correlation",
+        "curvature_response",
+        "causal_feedback",
+        "spectral_equilibrium",
+        "discrete_resonance",
+    }
+    corr = feedback["frontier_unity_correlation"]
+    assert math.isnan(corr) or -1.0000001 <= corr <= 1.0000001
+    curvature = feedback["curvature_response"]
+    assert math.isnan(curvature) or math.isfinite(curvature)
+    spectral = feedback["spectral_equilibrium"]
+    assert math.isnan(spectral) or 0.0 < spectral <= 1.0
+    resonance = feedback["discrete_resonance"]
+    assert math.isnan(resonance) or math.isfinite(resonance)
+
+
+def test_analyze_unification_feedback_requires_positive_steps() -> None:
+    engine = RewriteEngine(Hypergraph([(0, 1, 2)]), EdgeSplit3Rule(), seed=127)
+    with pytest.raises(ValueError):
+        analyze_unification_feedback(engine, steps=0)
 
 
 def test_synthesize_unification_attractor_fuses_sliding_metrics() -> None:
