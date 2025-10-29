@@ -23,6 +23,7 @@ from metrics import (
     map_unification_resonance,
     synthesize_unification_attractor,
     harmonize_unification_channels,
+    trace_unification_phase_portrait,
     run_toy_unification_model,
 )
 from metrics.geom import (
@@ -325,6 +326,17 @@ def test_run_toy_unification_model_produces_bridge_metrics() -> None:
     assert result.manifest["mean_certificate_strength"] == result.manifest[
         "mean_certificate_strength"
     ]
+    assert set(result.phase_portrait) == {
+        "phase_area",
+        "frontier_phase_coupling",
+        "geometric_phase_coupling",
+        "causal_phase_gradient",
+        "unity_causal_correlation",
+        "phase_coherence",
+    }
+    assert math.isnan(result.phase_portrait["phase_coherence"]) or result.phase_portrait[
+        "phase_coherence"
+    ] >= 0
 
 
 def test_compute_unification_summary_respects_multiway_generations() -> None:
@@ -538,6 +550,36 @@ def test_synthesize_unification_attractor_validates_inputs() -> None:
         synthesize_unification_attractor(engine, steps=0)
     with pytest.raises(ValueError):
         synthesize_unification_attractor(engine, steps=1, window=0)
+
+
+def test_trace_unification_phase_portrait_links_channels() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=167)
+    portrait = trace_unification_phase_portrait(
+        engine,
+        steps=8,
+        spectral_max_time=4,
+        spectral_trials=60,
+        spectral_seed=173,
+        multiway_generations=2,
+    )
+
+    assert set(portrait) == {
+        "phase_area",
+        "frontier_phase_coupling",
+        "geometric_phase_coupling",
+        "causal_phase_gradient",
+        "unity_causal_correlation",
+        "phase_coherence",
+    }
+    assert portrait["phase_area"] == portrait["phase_area"] or math.isnan(portrait["phase_area"])
+    assert math.isnan(portrait["phase_coherence"]) or portrait["phase_coherence"] >= 0
+
+
+def test_trace_unification_phase_portrait_requires_positive_steps() -> None:
+    engine = RewriteEngine(Hypergraph([(0, 1, 2)]), EdgeSplit3Rule(), seed=179)
+    with pytest.raises(ValueError):
+        trace_unification_phase_portrait(engine, steps=0)
 
 
 def test_compose_unification_manifest_consolidates_channels() -> None:
