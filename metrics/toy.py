@@ -17,6 +17,8 @@ from .unification import (
     evaluate_unification_alignment,
     generate_unification_certificate,
     analyze_unification_feedback,
+    map_unification_resonance,
+    synthesize_unification_attractor,
 )
 
 
@@ -32,6 +34,8 @@ class ToyModelResult:
     robustness: Dict[str, float]
     landscape: Dict[str, float]
     feedback: Dict[str, float]
+    attractor: Dict[str, float]
+    resonance: Dict[str, float]
     manifest: Dict[str, float]
 
 
@@ -73,6 +77,17 @@ def run_toy_unification_model(
         :func:`metrics.unification.analyze_unification_feedback` that quantify
         how multiway branching, causal depth, and geometric consistency respond
         to one another.
+    ``attractor``
+        Sliding-window fusion of discrete, causal, geometric, and multiway
+        observables produced by
+        :func:`metrics.unification.synthesize_unification_attractor`.
+    ``resonance``
+        Survey of how varying the depth of the auxiliary multiway exploration
+        modulates blended observables via
+        :func:`metrics.unification.map_unification_resonance`.
+    ``manifest``
+        Aggregate statistics across multiple bridge metrics constructed by
+        :func:`metrics.unification.compose_unification_manifest`.
 
     The ``multiway_generations`` parameter adjusts how deeply the auxiliary
     multiway explorations probe when constructing these summaries.
@@ -93,51 +108,10 @@ def run_toy_unification_model(
         hypergraph = Hypergraph(base_edges)
         return RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=local_seed)
 
-    history_engine = make_engine(seed)
-    history = collect_unification_dynamics(
-        history_engine,
-        steps=steps,
-        spectral_max_time=spectral_max_time,
-        spectral_trials=spectral_trials,
-        spectral_seed=seed,
-        multiway_generations=multiway_generations,
-    )
-    final_summary = history[-1]
-
-    certificate_engine = make_engine(seed + 1)
-    certificate = generate_unification_certificate(
-        certificate_engine,
-        steps=steps,
-        spectral_max_time=spectral_max_time,
-        spectral_trials=spectral_trials,
-        spectral_seed=seed + 1,
-        multiway_generations=multiway_generations,
-    )
-
-    principles_engine = make_engine(seed + 2)
-    principles = derive_unification_principles(
-        principles_engine,
-        steps=steps,
-        spectral_max_time=spectral_max_time,
-        spectral_trials=spectral_trials,
-        spectral_seed=seed + 2,
-        multiway_generations=multiway_generations,
-    )
-
-    alignment_engine = make_engine(seed + 3)
-    alignment = evaluate_unification_alignment(
-        alignment_engine,
-        steps=steps,
-        spectral_max_time=spectral_max_time,
-        spectral_trials=spectral_trials,
-        spectral_seed=seed + 3,
-        multiway_generations=multiway_generations,
-    )
-
-    def factory_generator() -> "Factory":
+    def make_factory_stream(start_seed: int) -> "Factory":
         class Factory:
             def __init__(self) -> None:
-                self._next_seed = seed + 4
+                self._next_seed = start_seed
 
             def __call__(self) -> RewriteEngine:
                 engine = make_engine(self._next_seed)
@@ -146,44 +120,123 @@ def run_toy_unification_model(
 
         return Factory()
 
+    next_seed = seed
+
+    history_engine = make_engine(next_seed)
+    history = collect_unification_dynamics(
+        history_engine,
+        steps=steps,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=next_seed,
+        multiway_generations=multiway_generations,
+    )
+    final_summary = history[-1]
+    next_seed += 1
+
+    certificate_engine = make_engine(next_seed)
+    certificate = generate_unification_certificate(
+        certificate_engine,
+        steps=steps,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=next_seed,
+        multiway_generations=multiway_generations,
+    )
+    next_seed += 1
+
+    principles_engine = make_engine(next_seed)
+    principles = derive_unification_principles(
+        principles_engine,
+        steps=steps,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=next_seed,
+        multiway_generations=multiway_generations,
+    )
+    next_seed += 1
+
+    alignment_engine = make_engine(next_seed)
+    alignment = evaluate_unification_alignment(
+        alignment_engine,
+        steps=steps,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=next_seed,
+        multiway_generations=multiway_generations,
+    )
+    next_seed += 1
+
+    robustness_factory = make_factory_stream(next_seed)
     robustness = assess_unification_robustness(
-        factory_generator(),
+        robustness_factory,
         steps=steps,
         replicates=replicates,
         spectral_max_time=spectral_max_time,
         spectral_trials=spectral_trials,
-        spectral_seed=seed + 4,
+        spectral_seed=next_seed,
         multiway_generations=multiway_generations,
     )
+    next_seed += replicates
 
-    landscape_engine = make_engine(seed + 5)
+    landscape_engine = make_engine(next_seed)
     landscape = construct_unification_landscape(
         landscape_engine,
         steps=steps,
         spectral_max_time=spectral_max_time,
         spectral_trials=spectral_trials,
-        spectral_seed=seed + 5,
+        spectral_seed=next_seed,
         multiway_generations=multiway_generations,
     )
+    next_seed += 1
 
-    feedback_engine = make_engine(seed + 6)
+    feedback_engine = make_engine(next_seed)
     feedback = analyze_unification_feedback(
         feedback_engine,
         steps=steps,
         spectral_max_time=spectral_max_time,
         spectral_trials=spectral_trials,
-        spectral_seed=seed + 6,
+        spectral_seed=next_seed,
         multiway_generations=multiway_generations,
     )
+    next_seed += 1
 
-    manifest_factory = factory_generator()
+    attractor_engine = make_engine(next_seed)
+    attractor = synthesize_unification_attractor(
+        attractor_engine,
+        steps=steps,
+        window=min(4, steps),
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=next_seed,
+        multiway_generations=multiway_generations,
+    )
+    next_seed += 1
+
+    depth_candidates = {0, multiway_generations}
+    if multiway_generations > 0:
+        depth_candidates.add(max(1, multiway_generations // 2))
+    resonance_depths = sorted(depth_candidates)
+
+    resonance_factory = make_factory_stream(next_seed)
+    resonance = map_unification_resonance(
+        resonance_factory,
+        steps=steps,
+        multiway_depths=resonance_depths,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=next_seed,
+    )
+    next_seed += len(resonance_depths)
+
+    manifest_factory = make_factory_stream(next_seed)
     manifest = compose_unification_manifest(
         manifest_factory,
         steps=steps,
         replicates=replicates,
         spectral_max_time=spectral_max_time,
         spectral_trials=spectral_trials,
-        spectral_seed=seed + 7,
+        spectral_seed=next_seed,
         multiway_generations=multiway_generations,
     )
 
@@ -196,6 +249,8 @@ def run_toy_unification_model(
         robustness=robustness,
         landscape=landscape,
         feedback=feedback,
+        attractor=attractor,
+        resonance=resonance,
         manifest=manifest,
     )
 
