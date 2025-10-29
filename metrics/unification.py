@@ -535,6 +535,124 @@ def evaluate_unification_alignment(
     }
 
 
+def analyze_unification_feedback(
+    engine: RewriteEngine,
+    steps: int,
+    *,
+    spectral_max_time: int = 6,
+    spectral_trials: int = 200,
+    spectral_seed: int | None = None,
+    multiway_generations: int = 2,
+) -> Dict[str, float]:
+    """Measure feedback loops between discrete, causal, and geometric channels.
+
+    The returned dictionary provides five complementary observables:
+
+    ``frontier_unity_correlation``
+        Pearson correlation between the size of the multiway frontier and the
+        unity consistency observable, highlighting how branching richness aligns
+        with geometric regularity.
+    ``curvature_response``
+        Linear-response coefficient describing how the unity observable reacts
+        to shifts in mean Forman curvature across the recorded history.
+    ``causal_feedback``
+        Correlation between normalized causal depth and the discretization
+        index, capturing how deeply layered causality reinforces discrete
+        growth.
+    ``spectral_equilibrium``
+        Normalized proximity between the terminal spectral dimension and its
+        historical average, with values near ``1`` signalling stable geometric
+        behaviour.
+    ``discrete_resonance``
+        Finite average of the product between information density and frontier
+        size, serving as a coarse resonance indicator between discrete growth
+        and multiway expansion.
+    """
+
+    if steps <= 0:
+        raise ValueError("steps must be positive")
+
+    history = collect_unification_dynamics(
+        engine,
+        steps,
+        include_initial=True,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=spectral_seed,
+        multiway_generations=multiway_generations,
+    )
+
+    if len(history) < 2:
+        return {
+            "frontier_unity_correlation": float("nan"),
+            "curvature_response": float("nan"),
+            "causal_feedback": float("nan"),
+            "spectral_equilibrium": float("nan"),
+            "discrete_resonance": float("nan"),
+        }
+
+    frontier_pairs = _collect_pairs(
+        history,
+        "multiway_frontier_size",
+        "unity_consistency",
+    )
+    frontier_unity_correlation = _pearson_from_pairs(frontier_pairs)
+
+    curvature_pairs = _collect_pairs(
+        history,
+        "mean_forman_curvature",
+        "unity_consistency",
+    )
+    if len(curvature_pairs) >= 2:
+        xs = [pair[0] for pair in curvature_pairs]
+        ys = [pair[1] for pair in curvature_pairs]
+        mean_x = sum(xs) / len(xs)
+        mean_y = sum(ys) / len(ys)
+        var_x = sum((x - mean_x) ** 2 for x in xs)
+        if var_x > 0:
+            cov = sum((x - mean_x) * (y - mean_y) for x, y in curvature_pairs)
+            curvature_response = cov / var_x
+        else:
+            curvature_response = float("nan")
+    else:
+        curvature_response = float("nan")
+
+    causal_pairs = _collect_pairs(
+        history,
+        "causal_max_depth",
+        "discretization_index",
+        x_transform=lambda depth, entry: depth
+        / (1.0 + float(entry.get("event_count", 0.0))),
+    )
+    causal_feedback = _pearson_from_pairs(causal_pairs)
+
+    spectral_values = [
+        float(entry.get("spectral_dimension", float("nan"))) for entry in history
+    ]
+    spectral_average = _finite_average(spectral_values)
+    final_spectral = spectral_values[-1]
+    if math.isfinite(final_spectral) and math.isfinite(spectral_average):
+        spectral_equilibrium = 1.0 / (1.0 + abs(final_spectral - spectral_average))
+    else:
+        spectral_equilibrium = float("nan")
+
+    resonance_components: List[float] = []
+    for entry in history:
+        frontier = float(entry.get("multiway_frontier_size", float("nan")))
+        density = float(entry.get("information_density", float("nan")))
+        if math.isfinite(frontier) and math.isfinite(density):
+            resonance_components.append(frontier * density)
+    discrete_resonance = _finite_average(resonance_components)
+
+    return {
+        "frontier_unity_correlation": frontier_unity_correlation,
+        "curvature_response": curvature_response,
+        "causal_feedback": causal_feedback,
+        "spectral_equilibrium": spectral_equilibrium,
+        "discrete_resonance": discrete_resonance,
+    }
+
+
 def assess_unification_robustness(
     engine_factory: Callable[[], RewriteEngine],
     *,
@@ -1265,4 +1383,5 @@ __all__ = [
     "construct_unification_landscape",
     "synthesize_unification_attractor",
     "compose_unification_manifest",
+    "analyze_unification_feedback",
 ]

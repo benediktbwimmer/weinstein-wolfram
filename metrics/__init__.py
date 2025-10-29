@@ -15,6 +15,7 @@ from .unification import (
     derive_unification_principles,
     evaluate_unification_alignment,
     generate_unification_certificate,
+    analyze_unification_feedback,
     map_unification_resonance,
     synthesize_unification_attractor,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "derive_unification_principles",
     "assess_unification_robustness",
     "evaluate_unification_alignment",
+    "analyze_unification_feedback",
     "map_unification_resonance",
     "synthesize_unification_attractor",
     "compose_unification_manifest",

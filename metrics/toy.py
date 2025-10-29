@@ -16,6 +16,7 @@ from .unification import (
     derive_unification_principles,
     evaluate_unification_alignment,
     generate_unification_certificate,
+    analyze_unification_feedback,
 )
 
 
@@ -30,6 +31,7 @@ class ToyModelResult:
     alignment: Dict[str, float]
     robustness: Dict[str, float]
     landscape: Dict[str, float]
+    feedback: Dict[str, float]
     manifest: Dict[str, float]
 
 
@@ -66,6 +68,11 @@ def run_toy_unification_model(
     ``landscape``
         A synthesized summary of the multiway/discrete interplay generated via
         :func:`metrics.unification.construct_unification_landscape`.
+    ``feedback``
+        Cross-channel feedback indicators computed by
+        :func:`metrics.unification.analyze_unification_feedback` that quantify
+        how multiway branching, causal depth, and geometric consistency respond
+        to one another.
 
     The ``multiway_generations`` parameter adjusts how deeply the auxiliary
     multiway explorations probe when constructing these summaries.
@@ -159,6 +166,16 @@ def run_toy_unification_model(
         multiway_generations=multiway_generations,
     )
 
+    feedback_engine = make_engine(seed + 6)
+    feedback = analyze_unification_feedback(
+        feedback_engine,
+        steps=steps,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=seed + 6,
+        multiway_generations=multiway_generations,
+    )
+
     manifest_factory = factory_generator()
     manifest = compose_unification_manifest(
         manifest_factory,
@@ -166,7 +183,7 @@ def run_toy_unification_model(
         replicates=replicates,
         spectral_max_time=spectral_max_time,
         spectral_trials=spectral_trials,
-        spectral_seed=seed + 6,
+        spectral_seed=seed + 7,
         multiway_generations=multiway_generations,
     )
 
@@ -178,6 +195,7 @@ def run_toy_unification_model(
         alignment=alignment,
         robustness=robustness,
         landscape=landscape,
+        feedback=feedback,
         manifest=manifest,
     )
 
