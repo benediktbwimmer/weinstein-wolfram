@@ -306,6 +306,19 @@ def test_run_toy_unification_model_produces_bridge_metrics() -> None:
     assert math.isnan(result.feedback["spectral_equilibrium"]) or 0.0 < result.feedback[
         "spectral_equilibrium"
     ] <= 1.0
+    assert set(result.attractor) == {
+        "discrete_persistence",
+        "geometric_resonance",
+        "causal_gradient",
+        "multiway_pressure",
+    }
+    assert any(math.isfinite(value) for value in result.attractor.values())
+    assert result.resonance["depths_evaluated"] >= 1.0
+    assert math.isnan(result.resonance["depth_span"]) or result.resonance["depth_span"] >= 0
+    assert "resonance_score" in result.resonance
+    assert math.isnan(result.resonance["resonance_score"]) or result.resonance[
+        "resonance_score"
+    ] >= 0
     assert result.manifest["replicates"] == 2.0
     assert "concordance_index" in result.manifest
     assert result.manifest["mean_certificate_strength"] == result.manifest[
