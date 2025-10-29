@@ -21,6 +21,7 @@ from .unification import (
     synthesize_unification_attractor,
     trace_unification_phase_portrait,
     orchestrate_unification_symphony,
+    integrate_unification_nexus,
 )
 
 
@@ -41,6 +42,7 @@ class ToyModelResult:
     resonance: Dict[str, float]
     manifest: Dict[str, float]
     phase_portrait: Dict[str, float]
+    nexus: Dict[str, float]
 
 
 def run_toy_unification_model(
@@ -256,6 +258,17 @@ def run_toy_unification_model(
     )
     next_seed += 1
 
+    nexus_engine = make_engine(next_seed)
+    nexus = integrate_unification_nexus(
+        nexus_engine,
+        steps=steps,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=next_seed,
+        multiway_generations=multiway_generations,
+    )
+    next_seed += 1
+
     manifest_factory = make_factory_stream(next_seed)
     manifest = compose_unification_manifest(
         manifest_factory,
@@ -281,6 +294,7 @@ def run_toy_unification_model(
         resonance=resonance,
         manifest=manifest,
         phase_portrait=phase_portrait,
+        nexus=nexus,
     )
 
 
