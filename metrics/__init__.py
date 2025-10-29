@@ -18,6 +18,7 @@ from .unification import (
     analyze_unification_feedback,
     map_unification_resonance,
     synthesize_unification_attractor,
+    harmonize_unification_channels,
 )
 from .toy import ToyModelResult, run_toy_unification_model
 
@@ -37,6 +38,7 @@ __all__ = [
     "map_unification_resonance",
     "synthesize_unification_attractor",
     "compose_unification_manifest",
+    "harmonize_unification_channels",
     "ToyModelResult",
     "run_toy_unification_model",
 ]
