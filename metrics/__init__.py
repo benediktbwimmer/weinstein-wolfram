@@ -20,6 +20,7 @@ from .unification import (
     synthesize_unification_attractor,
     harmonize_unification_channels,
     orchestrate_unification_symphony,
+    calibrate_unification_compass,
     trace_unification_phase_portrait,
 )
 from .toy import ToyModelResult, run_toy_unification_model
@@ -42,6 +43,7 @@ __all__ = [
     "compose_unification_manifest",
     "harmonize_unification_channels",
     "orchestrate_unification_symphony",
+    "calibrate_unification_compass",
     "trace_unification_phase_portrait",
     "ToyModelResult",
     "run_toy_unification_model",

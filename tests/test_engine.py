@@ -24,6 +24,7 @@ from metrics import (
     synthesize_unification_attractor,
     harmonize_unification_channels,
     orchestrate_unification_symphony,
+    calibrate_unification_compass,
     trace_unification_phase_portrait,
     run_toy_unification_model,
 )
@@ -528,6 +529,44 @@ def test_harmonize_unification_channels_requires_positive_steps() -> None:
     engine = RewriteEngine(Hypergraph([(0, 1, 2)]), EdgeSplit3Rule(), seed=151)
     with pytest.raises(ValueError):
         harmonize_unification_channels(engine, steps=0)
+
+
+def test_calibrate_unification_compass_tracks_directionality() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=173)
+    compass = calibrate_unification_compass(
+        engine,
+        steps=7,
+        spectral_max_time=4,
+        spectral_trials=60,
+        spectral_seed=181,
+        multiway_generations=2,
+    )
+
+    expected_keys = {
+        "discrete_drift",
+        "unity_drift",
+        "causal_depth_drift",
+        "multiway_frontier_drift",
+        "spectral_drift",
+        "event_discrete_correlation",
+        "event_unity_correlation",
+        "event_causal_correlation",
+        "event_frontier_correlation",
+        "compass_alignment",
+        "drift_magnitude",
+    }
+    assert expected_keys.issubset(compass.keys())
+
+    assert math.isnan(compass["drift_magnitude"]) or compass["drift_magnitude"] >= 0
+    assert math.isnan(compass["compass_alignment"]) or 0.0 <= compass["compass_alignment"] <= 1.0000001
+    assert math.isnan(compass["event_unity_correlation"]) or -1.0 <= compass["event_unity_correlation"] <= 1.0
+
+
+def test_calibrate_unification_compass_requires_positive_steps() -> None:
+    engine = RewriteEngine(Hypergraph([(0, 1, 2)]), EdgeSplit3Rule(), seed=179)
+    with pytest.raises(ValueError):
+        calibrate_unification_compass(engine, steps=0)
 
 
 def test_orchestrate_unification_symphony_fuses_correlations() -> None:
