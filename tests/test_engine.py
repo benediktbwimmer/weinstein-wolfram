@@ -18,6 +18,7 @@ from metrics import (
     compute_unification_summary,
     derive_unification_principles,
     evaluate_unification_alignment,
+    integrate_unification_nexus,
     generate_unification_certificate,
     analyze_unification_feedback,
     map_unification_resonance,
@@ -351,6 +352,14 @@ def test_run_toy_unification_model_produces_bridge_metrics() -> None:
     assert math.isnan(result.phase_portrait["phase_coherence"]) or result.phase_portrait[
         "phase_coherence"
     ] >= 0
+    assert set(result.nexus) == {
+        "discrete_unity_covariance",
+        "curvature_frontier_covariance",
+        "causal_growth_alignment",
+        "unity_spectral_correlation",
+        "nexus_strength",
+    }
+    assert math.isnan(result.nexus["nexus_strength"]) or result.nexus["nexus_strength"] >= 0
 
 
 def test_compute_unification_summary_respects_multiway_generations() -> None:
@@ -529,6 +538,45 @@ def test_harmonize_unification_channels_requires_positive_steps() -> None:
     engine = RewriteEngine(Hypergraph([(0, 1, 2)]), EdgeSplit3Rule(), seed=151)
     with pytest.raises(ValueError):
         harmonize_unification_channels(engine, steps=0)
+
+
+def test_integrate_unification_nexus_bridges_covariances() -> None:
+    hypergraph = Hypergraph([(0, 1, 2)])
+    engine = RewriteEngine(hypergraph, EdgeSplit3Rule(), seed=163)
+    nexus = integrate_unification_nexus(
+        engine,
+        steps=8,
+        spectral_max_time=4,
+        spectral_trials=60,
+        spectral_seed=167,
+        multiway_generations=2,
+    )
+
+    assert set(nexus) == {
+        "discrete_unity_covariance",
+        "curvature_frontier_covariance",
+        "causal_growth_alignment",
+        "unity_spectral_correlation",
+        "nexus_strength",
+    }
+
+    for key in (
+        "discrete_unity_covariance",
+        "curvature_frontier_covariance",
+        "causal_growth_alignment",
+        "unity_spectral_correlation",
+    ):
+        value = nexus[key]
+        assert math.isnan(value) or math.isfinite(value)
+
+    strength = nexus["nexus_strength"]
+    assert math.isnan(strength) or strength >= 0
+
+
+def test_integrate_unification_nexus_requires_positive_steps() -> None:
+    engine = RewriteEngine(Hypergraph([(0, 1, 2)]), EdgeSplit3Rule(), seed=169)
+    with pytest.raises(ValueError):
+        integrate_unification_nexus(engine, steps=0)
 
 
 def test_calibrate_unification_compass_tracks_directionality() -> None:

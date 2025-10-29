@@ -81,6 +81,18 @@ def _pearson_from_pairs(pairs: Sequence[Tuple[float, float]]) -> float:
     return cov / math.sqrt(var_x * var_y)
 
 
+def _covariance_from_pairs(pairs: Sequence[Tuple[float, float]]) -> float:
+    """Return the population covariance for a collection of value pairs."""
+
+    if len(pairs) < 2:
+        return float("nan")
+    xs = [pair[0] for pair in pairs]
+    ys = [pair[1] for pair in pairs]
+    mean_x = sum(xs) / len(xs)
+    mean_y = sum(ys) / len(ys)
+    return sum((x - mean_x) * (y - mean_y) for x, y in pairs) / len(pairs)
+
+
 def compute_unification_summary(
     engine: RewriteEngine,
     *,
@@ -1519,6 +1531,147 @@ def harmonize_unification_channels(
     }
 
 
+def integrate_unification_nexus(
+    engine: RewriteEngine,
+    steps: int,
+    *,
+    spectral_max_time: int = 6,
+    spectral_trials: int = 200,
+    spectral_seed: int | None = None,
+    multiway_generations: int = 2,
+) -> Dict[str, float]:
+    """Fuse core bridge observables into a compact "nexus" summary.
+
+    The nexus ties together complementary data channels gathered via
+    :func:`collect_unification_dynamics` to emphasize how discrete growth,
+    causal layering, geometric regularity, and multiway branching reinforce one
+    another during a rewrite experiment.  It reports five derived quantities:
+
+    ``discrete_unity_covariance``
+        Population covariance between the discretization index and unity
+        consistency across the recorded history.  Positive values indicate that
+        discrete growth accompanies improved geometric harmony.
+    ``curvature_frontier_covariance``
+        Covariance between mean Forman curvature and the size of the multiway
+        frontier, highlighting whether geometric cues expand or contract in
+        tandem with branching richness.
+    ``causal_growth_alignment``
+        Ratio comparing the change in normalized causal depth to the magnitude
+        of the node growth rate.  Values near ``0`` indicate shallow coupling
+        whereas larger magnitudes denote strong alignment between causal
+        layering and discrete expansion.
+    ``unity_spectral_correlation``
+        Pearson correlation between unity consistency and spectral dimension,
+        providing a gauge for how emergent dimensionality mirrors the unity
+        observable.
+    ``nexus_strength``
+        Mean absolute magnitude of the previous four quantities, serving as an
+        overall strength indicator for the cross-channel coupling.
+
+    The ``multiway_generations`` parameter mirrors the one used by
+    :func:`collect_unification_dynamics`, allowing callers to control how
+    deeply the auxiliary multiway branching structure is explored while the
+    nexus is assembled.
+    """
+
+    if steps <= 0:
+        raise ValueError("steps must be positive")
+
+    history = collect_unification_dynamics(
+        engine,
+        steps,
+        include_initial=True,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=spectral_seed,
+        multiway_generations=multiway_generations,
+    )
+
+    if len(history) < 2:
+        return {
+            "discrete_unity_covariance": float("nan"),
+            "curvature_frontier_covariance": float("nan"),
+            "causal_growth_alignment": float("nan"),
+            "unity_spectral_correlation": float("nan"),
+            "nexus_strength": float("nan"),
+        }
+
+    discrete_pairs = _collect_pairs(
+        history,
+        "discretization_index",
+        "unity_consistency",
+    )
+    discrete_unity_covariance = _covariance_from_pairs(discrete_pairs)
+
+    curvature_pairs = _collect_pairs(
+        history,
+        "mean_forman_curvature",
+        "multiway_frontier_size",
+    )
+    curvature_frontier_covariance = _covariance_from_pairs(curvature_pairs)
+
+    first = history[0]
+    last = history[-1]
+    node_span = float(last.get("node_count", 0.0) - first.get("node_count", 0.0))
+    event_span = float(last.get("event_count", 0.0) - first.get("event_count", 0.0))
+    growth_rate = _safe_ratio(node_span, event_span)
+
+    normalized_depths: List[float] = []
+    event_counts: List[float] = []
+    for entry in history:
+        depth = float(entry.get("causal_max_depth", float("nan")))
+        events = float(entry.get("event_count", 0.0))
+        normalized = depth / (1.0 + events)
+        normalized_depths.append(normalized if math.isfinite(normalized) else float("nan"))
+        event_counts.append(events)
+
+    first_index = next(
+        (index for index, value in enumerate(normalized_depths) if math.isfinite(value)),
+        None,
+    )
+    last_index = next(
+        (
+            len(normalized_depths) - 1 - index
+            for index, value in enumerate(reversed(normalized_depths))
+            if math.isfinite(value)
+        ),
+        None,
+    )
+
+    if first_index is not None and last_index is not None and first_index != last_index:
+        depth_delta = normalized_depths[last_index] - normalized_depths[first_index]
+        causal_growth_alignment = (
+            _safe_ratio(depth_delta, 1.0 + abs(growth_rate))
+            if math.isfinite(depth_delta) and math.isfinite(growth_rate)
+            else float("nan")
+        )
+    else:
+        causal_growth_alignment = float("nan")
+
+    spectral_pairs = _collect_pairs(
+        history,
+        "spectral_dimension",
+        "unity_consistency",
+    )
+    unity_spectral_correlation = _pearson_from_pairs(spectral_pairs)
+
+    strength_components = [
+        abs(discrete_unity_covariance),
+        abs(curvature_frontier_covariance),
+        abs(causal_growth_alignment),
+        abs(unity_spectral_correlation),
+    ]
+    nexus_strength = _finite_average(strength_components)
+
+    return {
+        "discrete_unity_covariance": discrete_unity_covariance,
+        "curvature_frontier_covariance": curvature_frontier_covariance,
+        "causal_growth_alignment": causal_growth_alignment,
+        "unity_spectral_correlation": unity_spectral_correlation,
+        "nexus_strength": nexus_strength,
+    }
+
+
 def calibrate_unification_compass(
     engine: RewriteEngine,
     steps: int,
@@ -2004,6 +2157,7 @@ __all__ = [
     "compose_unification_manifest",
     "analyze_unification_feedback",
     "harmonize_unification_channels",
+    "integrate_unification_nexus",
     "orchestrate_unification_symphony",
     "calibrate_unification_compass",
     "trace_unification_phase_portrait",
