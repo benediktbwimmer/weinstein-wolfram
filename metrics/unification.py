@@ -1519,6 +1519,165 @@ def harmonize_unification_channels(
     }
 
 
+def trace_unification_phase_portrait(
+    engine: RewriteEngine,
+    steps: int,
+    *,
+    spectral_max_time: int = 6,
+    spectral_trials: int = 200,
+    spectral_seed: int | None = None,
+    multiway_generations: int = 2,
+) -> Dict[str, float]:
+    """Trace a phase portrait linking discrete and geometric observables.
+
+    The phase portrait complements the other bridge metrics by explicitly
+    charting how the discretization index and unity observable co-evolve during
+    a rewrite experiment.  The returned dictionary provides five derived
+    quantities:
+
+    ``phase_area``
+        Absolute area swept in the (discretization, unity) plane using a
+        trapezoidal estimate ordered by executed events.  This measures the
+        cumulative interplay between Wolfram-style growth and Weinstein's unity
+        cues.
+    ``frontier_phase_coupling``
+        Pearson correlation between discretization index and multiway frontier
+        size across the recorded history.
+    ``geometric_phase_coupling``
+        Pearson correlation between the unity observable and mean Forman
+        curvature.
+    ``causal_phase_gradient``
+        Finite-difference gradient of normalized causal depth with respect to
+        executed events.
+    ``unity_causal_correlation``
+        Pearson correlation between normalized causal depth and the unity
+        observable.
+    ``phase_coherence``
+        Mean absolute value of the three correlation coefficients, offering a
+        compact harmony indicator for the phase portrait.
+
+    ``multiway_generations`` mirrors the parameter used by
+    :func:`collect_unification_dynamics`, allowing callers to tune the depth of
+    the auxiliary multiway exploration informing each snapshot.
+    """
+
+    if steps <= 0:
+        raise ValueError("steps must be positive")
+
+    history = collect_unification_dynamics(
+        engine,
+        steps,
+        include_initial=True,
+        spectral_max_time=spectral_max_time,
+        spectral_trials=spectral_trials,
+        spectral_seed=spectral_seed,
+        multiway_generations=multiway_generations,
+    )
+
+    if len(history) < 2:
+        return {
+            "phase_area": float("nan"),
+            "frontier_phase_coupling": float("nan"),
+            "geometric_phase_coupling": float("nan"),
+            "causal_phase_gradient": float("nan"),
+            "unity_causal_correlation": float("nan"),
+            "phase_coherence": float("nan"),
+        }
+
+    phase_points: List[Tuple[float, float, float]] = []
+    for entry in history:
+        discretization = float(entry.get("discretization_index", float("nan")))
+        unity = float(entry.get("unity_consistency", float("nan")))
+        events = float(entry.get("event_count", 0.0))
+        if math.isfinite(discretization) and math.isfinite(unity):
+            phase_points.append((events, discretization, unity))
+
+    phase_points.sort(key=lambda item: item[0])
+
+    if len(phase_points) >= 2:
+        area = 0.0
+        _, previous_discretization, previous_unity = phase_points[0]
+        for _, discretization, unity in phase_points[1:]:
+            area += 0.5 * (previous_unity + unity) * (discretization - previous_discretization)
+            previous_discretization = discretization
+            previous_unity = unity
+        phase_area = abs(area)
+    else:
+        phase_area = float("nan")
+
+    frontier_pairs = _collect_pairs(
+        history,
+        "discretization_index",
+        "multiway_frontier_size",
+    )
+    frontier_phase_coupling = _pearson_from_pairs(frontier_pairs)
+
+    geometric_pairs = _collect_pairs(
+        history,
+        "unity_consistency",
+        "mean_forman_curvature",
+    )
+    geometric_phase_coupling = _pearson_from_pairs(geometric_pairs)
+
+    causal_pairs = _collect_pairs(
+        history,
+        "causal_max_depth",
+        "unity_consistency",
+        x_transform=lambda depth, entry: depth
+        / (1.0 + float(entry.get("event_count", 0.0))),
+    )
+    unity_causal_correlation = _pearson_from_pairs(causal_pairs)
+
+    normalized_depths: List[float] = []
+    event_counts: List[float] = []
+    for entry in history:
+        depth = float(entry.get("causal_max_depth", float("nan")))
+        events = float(entry.get("event_count", 0.0))
+        normalized = depth / (1.0 + events) if math.isfinite(depth) else float("nan")
+        normalized_depths.append(normalized if math.isfinite(normalized) else float("nan"))
+        event_counts.append(events)
+
+    first_index = next(
+        (index for index, value in enumerate(normalized_depths) if math.isfinite(value)),
+        None,
+    )
+    last_index = next(
+        (
+            len(normalized_depths) - 1 - index
+            for index, value in enumerate(reversed(normalized_depths))
+            if math.isfinite(value)
+        ),
+        None,
+    )
+
+    if first_index is not None and last_index is not None and first_index != last_index:
+        depth_delta = normalized_depths[last_index] - normalized_depths[first_index]
+        event_delta = event_counts[last_index] - event_counts[first_index]
+        causal_phase_gradient = _safe_ratio(depth_delta, event_delta) if event_delta else float("nan")
+    else:
+        causal_phase_gradient = float("nan")
+
+    coherence_components = [
+        abs(value)
+        for value in (
+            frontier_phase_coupling,
+            geometric_phase_coupling,
+            unity_causal_correlation,
+        )
+        if math.isfinite(value)
+    ]
+    phase_coherence = _finite_average(coherence_components)
+
+    return {
+        "phase_area": phase_area,
+        "frontier_phase_coupling": frontier_phase_coupling,
+        "geometric_phase_coupling": geometric_phase_coupling,
+        "causal_phase_gradient": causal_phase_gradient,
+        "unity_causal_correlation": unity_causal_correlation,
+        "phase_coherence": phase_coherence,
+    }
+
+
 __all__ = [
     "compute_unification_summary",
     "collect_unification_dynamics",
@@ -1532,4 +1691,5 @@ __all__ = [
     "compose_unification_manifest",
     "analyze_unification_feedback",
     "harmonize_unification_channels",
+    "trace_unification_phase_portrait",
 ]
